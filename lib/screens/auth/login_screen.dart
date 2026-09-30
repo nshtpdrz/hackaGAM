@@ -6,7 +6,7 @@ import '../../core/mock_api.dart';
 import '../../core/state.dart';
 import '../../core/theme.dart';
 import '../../widgets/components.dart';
-import 'register_screen.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/tr.dart';
 import '../../core/api_modelos.dart';
 import '../../core/sync.dart';
@@ -19,8 +19,35 @@ class LoginScreen extends ConsumerStatefulWidget { const LoginScreen({super.key}
   @override ConsumerState<LoginScreen> createState() => _LoginState(); }
 class _LoginState extends ConsumerState<LoginScreen> {
   final _e = TextEditingController(), _p = TextEditingController(); String? _err; bool _busy = false;
+  /// "Entrar con huella" solo si hay una sesión guardada y la biometría está activa en este teléfono (SE4).
+  bool _conHuella = false;
+  @override
+  void initState() {
+    super.initState();
+    () async {
+      try {
+        final ok = await readToken() != null && await biometriaActiva();
+        if (mounted && ok) setState(() => _conHuella = true);
+      } catch (_) {}
+    }();
+  }
   @override
   void dispose() { _e.dispose(); _p.dispose(); super.dispose(); }
+
+  /// Resultado por caso (bloqueado, sin huella registrada, cancelado…), no un solo mensaje.
+  Future<void> _entrarConHuella() async {
+    if (_busy) return;
+    setState(() { _busy = true; _err = null; });
+    try {
+      final r = await pedirIdentidad();
+      if (r == ResultadoBio.ok) { await ref.read(sessionProvider.notifier).restore(); }
+      else if (mounted) { setState(() => _err = mensajeBio(r)); }
+    } catch (e) {
+      if (mounted) setState(() => _err = isNetworkError(e) ? tr('No hay conexión con el servidor. Revisa el cable o la red.')
+          : mensajeError(e) ?? tr('No se pudo entrar. Inicia sesión con tu contraseña.'));
+    }
+    if (mounted) setState(() => _busy = false);
+  }
 
   Future<void> _entrar() async {
     if (_busy) return;
@@ -62,22 +89,12 @@ class _LoginState extends ConsumerState<LoginScreen> {
           child: Text(_err!, style: const TextStyle(color: C.error), semanticsLabel: tr('Error: {e}', {'e': _err}))),
       const SizedBox(height: 24),
       BigButton(t('login.go').text, onTap: _busy ? null : _entrar),
-      const SizedBox(height: 12), BigButton(t('login.bio').text, icon: Icons.fingerprint, secondary: true, onTap: () async {
-        try {
-          final ok = await readToken() != null && await biometriaActiva() && await autenticar();
-          if (ok) { await ref.read(sessionProvider.notifier).restore(); return; }
-        } catch (_) {}
-        if (mounted) setState(() => _err = tr('Activa la biometría en tu perfil e inicia sesión con tu contraseña una vez.')); }),
+      if (_conHuella) ...[const SizedBox(height: 12),
+        BigButton(t('login.bio').text, icon: Icons.fingerprint, secondary: true, onTap: _busy ? null : _entrarConHuella)],
 
 
       // 1. Navegación normal al presionar "Registrarse"
-            TextButton(
-              onPressed: () => Navigator.push(
-                c, 
-                MaterialPageRoute(builder: (_) => const RegisterScreen()),
-              ), 
-              child: Text(t('login.register').text),
-            ),
+            TextButton(onPressed: () => c.push('/registro'), child: Text(t('login.register').text)),
 
             if (useMock) ...[
               const Divider(height: 32), 
@@ -99,20 +116,6 @@ class _LoginState extends ConsumerState<LoginScreen> {
                     },
                   ),
                 ),
-
-              // 2. Botón de prueba destacado para probar la pantalla de Registro
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: BigButton(
-                  tr('Probar Pantalla de Registro'),
-                  secondary: true,
-                  icon: Icons.how_to_reg,
-                  onTap: () => Navigator.push(
-                    c,
-                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                  ),
-                ),
-              ),
             ],
           ],
         ),

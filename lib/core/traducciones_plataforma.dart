@@ -120,4 +120,8 @@ const Map<String, Map<String, String>> traduccionesPlataforma = {'en': {
   'Instala la voz en inglés en los Ajustes del teléfono para escuchar.': 'Install the English voice in your phone Settings to listen.',
   'Instala la voz en español en los Ajustes del teléfono para escuchar.': 'Install the Spanish voice in your phone Settings to listen.',
   'No se pudo leer en voz alta.': 'Could not read aloud.',
+  // Login con huella y errores 422 (login_screen.dart, api_modelos.dart)
+  'No se pudo analizar la foto. Tómala otra vez, de frente y con buena luz.': 'The photo could not be analyzed. Take it again, from the front and with good light.',
+  'Ese valor no es posible. Revisa el número que escribiste.': 'That value is not possible. Check the number you entered.',
+  'No se pudo entrar. Inicia sesión con tu contraseña.': 'Could not sign in. Log in with your password.',
 }};

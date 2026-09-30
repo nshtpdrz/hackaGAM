@@ -30,6 +30,10 @@ final _tabs = <Role, List<_Tab>>{
 };
 String homeFor(Role r) => _tabs[r]!.first.path;
 
+/// Pantallas que reciben sus datos en `extra`. Si se abren sin ellos (recarga en web, el sistema restaura la app,
+/// un enlace) no hay qué mostrar: se regresa a [destino] en lugar de tronar con `st.extra as Map` (PL8).
+String? _sinExtra(GoRouterState st, String destino) => st.extra is Map ? null : destino;
+
 final routerProvider = Provider<GoRouter>((ref) {
   final listenable = ValueNotifier(0);
   ref.listen(sessionProvider, (_, __) => listenable.value++);
@@ -47,23 +51,31 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/registro', builder: (_, __) => const RegisterScreen()),
       GoRoute(path: '/preferencias', builder: (_, __) => const PreferenciasScreen()),
-      GoRoute(path: '/perfil/editar', builder: (_, st) => EditarPerfilScreen(perfil: st.extra as Map)),
+      GoRoute(path: '/perfil/editar', redirect: (_, st) => _sinExtra(st, '/perfil'),
+        builder: (_, st) => EditarPerfilScreen(perfil: st.extra as Map)),
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/consentimiento', builder: (_, st) => ConsentimientoScreen(tutor: st.extra == true)),
       GoRoute(path: '/notificaciones', builder: (_, __) => const NotificacionesScreen()),
-      GoRoute(path: '/alerta/:id', builder: (_, st) => AlertaDetalleScreen(alerta: st.extra as Map)),
+      GoRoute(path: '/alerta/:id', redirect: (_, st) => _sinExtra(st, '/notificaciones'),
+        builder: (_, st) => AlertaDetalleScreen(alerta: st.extra as Map)),
       GoRoute(path: '/receta', builder: (_, __) => const RecetaFlowScreen()),
       GoRoute(path: '/pendientes', builder: (_, __) => const PendientesScreen()),
       GoRoute(path: '/diagnostico', builder: (_, __) => const DiagnosticoScreen()),
       GoRoute(path: '/paciente/:id', builder: (_, st) => PacienteDetalleScreen(id: st.pathParameters['id']!)),
       GoRoute(path: '/alta', builder: (_, __) => const AltaPacienteScreen()),
       GoRoute(path: '/heridas', builder: (_, __) => const HeridasScreen()),
-      GoRoute(path: '/heridas/nueva', builder: (_, st) => NuevaHeridaScreen(pacienteId: '${st.extra}')),
+      // Sin paciente en extra se usa el de la sesión (antes llegaba "null" como id).
+      GoRoute(path: '/heridas/nueva', builder: (_, st) {
+        final s = ref.read(sessionProvider);
+        return NuevaHeridaScreen(pacienteId: st.extra != null ? '${st.extra}' : (s?.patientId ?? s?.userId ?? ''));
+      }),
       GoRoute(path: '/paciente/:id/heridas', builder: (_, st) => HeridasScreen(pacienteId: st.pathParameters['id']!)),
       GoRoute(path: '/herida/:id', builder: (_, st) => HeridaDetalleScreen(id: st.pathParameters['id']!)),
       GoRoute(path: '/herida/:id/foto', builder: (_, st) => FotoHeridaScreen(lesionId: st.pathParameters['id']!)),
-      GoRoute(path: '/resultado', builder: (_, st) => ResultadoScreen(data: st.extra as Map)),
-      GoRoute(path: '/recordatorio', builder: (_, st) => RecordatorioScreen(toma: st.extra as Map)),
+      GoRoute(path: '/resultado', redirect: (_, st) => _sinExtra(st, '/hoy'),
+        builder: (_, st) => ResultadoScreen(data: st.extra as Map)),
+      GoRoute(path: '/recordatorio', redirect: (_, st) => _sinExtra(st, '/hoy'),
+        builder: (_, st) => RecordatorioScreen(toma: st.extra as Map)),
       GoRoute(path: '/qr', builder: (_, __) => const QrScreen()),
       GoRoute(path: '/expediente/:id', builder: (_, st) => ExpedienteScreen(id: st.pathParameters['id']!)),
       GoRoute(path: '/plan/:id', builder: (_, st) => PlanControlScreen(id: st.pathParameters['id']!)),

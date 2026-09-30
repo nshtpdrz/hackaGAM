@@ -37,6 +37,7 @@ dependencies:
   google_fonts: ^6.2.1
 dev_dependencies:
   flutter_test: {sdk: flutter}
+  integration_test: {sdk: flutter} # pruebas en el teléfono: flutter test integration_test -d <id>
   flutter_lints: ^4.0.0
   # Marca SENDA en Android/iOS (ya generadas; repetir solo si cambian los PNG de assets/marca):
   #   dart run flutter_launcher_icons && dart run flutter_native_splash:create

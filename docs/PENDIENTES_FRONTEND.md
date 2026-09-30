@@ -37,12 +37,15 @@ pantalla de diagnóstico. Revisar sus puntos (SE4, SE5, SE6, PL8, A6) al integra
 | NA1, NA2 | "Pedir ayuda" llama al cuidador (y al 911 en rojo); "Pasaron 30 minutos…" solo si nadie respondió. |
 | PA1–PA7 | Formulario del plan de control; "Ver expediente" oculto; código bajo el QR si es corto; Oncología; Hoy sin tomas conserva sus botones; Atrás en la receta regresa un paso o pregunta; PNG se sube como PNG. |
 | T1, T5 | `test/cola_y_sesion_test.dart` y `test/pendientes_frontend_test.dart`. |
+| SE4, SE5, SE6 | "Entrar con huella" solo con sesión guardada y biometría activa, con mensaje por caso; sin el botón de demo repetido; "Crear cuenta" por `/registro`. Ver contraseña, autocompletado y Enter: rama `senda-integracion`. |
+| PL8 | Rutas que reciben `extra` regresan a una pantalla segura si se abren sin él; `/heridas/nueva` usa el paciente de la sesión. |
+| A7 | El 422 genérico depende de la pantalla (receta, foto de herida u otro: "Revisa: …"); `valor_fuera_de_rango` tiene texto propio. |
+| T3 | `integration_test/app_test.dart` (inicio de sesión y registro en modo demo): `flutter test integration_test -d <id>`. |
 
 **Queda:**
 
-- En archivos que se editan en otra rama (no se tocaron): SE4, SE5, SE6 (`login_screen.dart`), PL8 (`router.dart`), A7 (`api_modelos.dart`).
 - Necesitan a backend o traductores: A5 (mapa `ote`), NA3 (`fecha_fin`), la omisión automática de NA2, código corto del QR (PA3), textos oficiales y firma del consentimiento (SE8), y confirmar los formatos propuestos abajo.
-- T3: pruebas en dispositivo (`integration_test`) y la lista de `docs/EMPAQUETADO.md`.
+- Correr `integration_test` y la lista de `docs/EMPAQUETADO.md` en un teléfono real (en la nube no hay dispositivo).
 
 ## Lo más urgente (lista original)
 

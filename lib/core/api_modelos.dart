@@ -75,6 +75,7 @@ String? mensajeError(Object e) {
     'sin_medicamentos' => tr('No detectamos medicamentos'),
     'ocr_no_disponible' => tr('La lectura automática no está disponible. Escribe la receta.'),
     'demasiados_intentos' => tr('Demasiados intentos. Espera un momento.'),
+    'valor_fuera_de_rango' => tr('Ese valor no es posible. Revisa el número que escribiste.'),
     _ => switch (x.estado) {
       // 400 trae en campos qué falló: se nombran para que la persona sepa qué corregir.
       400 => x.campos.isEmpty ? tr('Revisa los datos e intenta de nuevo.')
@@ -83,7 +84,12 @@ String? mensajeError(Object e) {
       403 => tr('Tu cuenta no puede ver esta información.'),
       404 => tr('No se encontró la información.'),
       409 => tr('Esto ya estaba registrado.'),
-      422 => tr('No se pudo leer la receta. Prueba con otra foto.'),
+      // 422 genérico: el texto depende de qué se envió (antes decía "receta" en cualquier pantalla).
+      422 => switch (e is DioException ? e.requestOptions.path : '') {
+        final p when p.contains('/documentos') => tr('No se pudo leer la receta. Prueba con otra foto.'),
+        final p when p.contains('/lesiones') => tr('No se pudo analizar la foto. Tómala otra vez, de frente y con buena luz.'),
+        _ => x.campos.isEmpty ? tr('Revisa los datos e intenta de nuevo.')
+            : tr('Revisa: {campos}.', {'campos': x.campos.keys.map((k) => tr(_nombresCampo[_raizCampo('$k')] ?? '$k')).toSet().join(', ')}) },
       429 => tr('Demasiados intentos. Espera un momento.'),
       503 => tr('El servicio no está disponible por ahora.'),
       _ => null } };
