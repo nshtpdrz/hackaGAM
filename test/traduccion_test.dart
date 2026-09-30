@@ -56,12 +56,14 @@ void main() {
 void _todoTraducido() {
   test('todo tr(\'…\') de lib/ tiene inglés', () {
     final en = {...traducciones['en']!, ...traduccionesExtra['en']!, ...traduccionesPlataforma['en']!};
-    final re = RegExp(r"""\btr\(\s*'((?:[^'\\]|\\.)*)'""");
+    // Texto partido en varias líneas ('a ' 'b'): se juntan los literales seguidos.
+    final re = RegExp(r"""\btr\(\s*((?:'(?:[^'\\]|\\.)*'\s*)+)""");
+    final lit = RegExp(r"""'((?:[^'\\]|\\.)*)'""");
     final faltan = <String>[];
     for (final f in Directory('lib').listSync(recursive: true).whereType<File>()) {
       if (!f.path.endsWith('.dart') || f.path.contains('traducciones')) continue;
       for (final m in re.allMatches(f.readAsStringSync())) {
-        final k = m.group(1)!.replaceAll(r"\'", "'");
+        final k = lit.allMatches(m.group(1)!).map((l) => l.group(1)!).join().replaceAll(r"\'", "'");
         if (!k.contains(r'$') && !en.containsKey(k)) faltan.add('${f.path}: $k');
       }
     }

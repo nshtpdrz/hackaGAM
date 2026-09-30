@@ -270,4 +270,6 @@ const _en = <String, String>{
   'Pierna': 'Leg', 'Tobillo': 'Ankle', 'Talón': 'Heel', 'Dorso del pie': 'Top of the foot', 'Planta del pie': 'Sole of the foot', 'Dedos del pie': 'Toes',
   'Izquierdo': 'Left', 'Derecho': 'Right', 'Centro': 'Center', 'Moneda de 10 pesos': '10-peso coin', 'Tarjeta': 'Card', 'Ninguna': 'None',
   'Medicamento {n} de {t}': 'Medication {n} of {t}',
+  'Marco legal: {m}': 'Legal framework: {m}',
+  'Tu cuenta está desactivada. Pide ayuda a tu clínica.': 'Your account is disabled. Ask your clinic for help.',
 };

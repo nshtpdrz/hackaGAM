@@ -17,7 +17,7 @@ alternativos en casi todo. Detalle y archivos de la app en `docs/PENDIENTES_FRON
   // solo cuidador (QR del paciente que lo tiene asignado):
   "codigo_qr": "...",
   // solo médico:
-  "cedula": "1234567", "clinica": "texto libre" }
+  "cedula_profesional": "1234567", "clinica": "texto libre" }
 ```
 
 - 2xx = cuenta creada.

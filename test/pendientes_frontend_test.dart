@@ -11,7 +11,6 @@ import 'package:medmap/core/api.dart';
 import 'package:medmap/core/permisos.dart';
 import 'package:medmap/core/state.dart';
 import 'package:medmap/screens/equipo/plan_control_screen.dart';
-import 'package:medmap/screens/paciente/registrar_screen.dart';
 import 'package:medmap/screens/paciente/resultado_screen.dart';
 import 'package:medmap/widgets/components.dart';
 import 'package:medmap/screens/shared.dart';
@@ -31,14 +30,6 @@ class _Api extends Api {
 
 void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
-
-  test('A8: valores poco probables piden confirmación', () {
-    expect(valorPocoProbable('presion', [1200, 80]), contains('1200'));
-    expect(valorPocoProbable('presion', [120, 8]), contains('abajo'));
-    expect(valorPocoProbable('presion', [120, 80]), isNull);
-    expect(valorPocoProbable('glucosa', 5), contains('5'));
-    expect(valorPocoProbable('glucosa', 110), isNull);
-  });
 
   test('D4: lo respondido hoy sobrevive a cerrar la app (por cuenta)', () async {
     var c = ProviderContainer(overrides: [sessionProvider.overrideWith(_Ses.new)]);

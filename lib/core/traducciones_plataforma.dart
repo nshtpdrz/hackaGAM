@@ -103,14 +103,6 @@ const Map<String, Map<String, String>> traduccionesPlataforma = {'en': {
   // Copia sin conexión y Hoy sin tomas (shared.dart, hoy_screen.dart)
   'Sin conexión. Mostramos lo último guardado ({fecha} {hora}).': 'No connection. Showing the last saved data ({fecha} {hora}).',
   'Hoy no tienes tomas de medicamento.': 'You have no medication doses today.',
-  // Valores poco probables al registrar (registrar_screen.dart)
-  '¿Tu presión de arriba es {n}?': 'Is your top blood pressure number {n}?',
-  '¿Tu presión de abajo es {n}?': 'Is your bottom blood pressure number {n}?',
-  '¿Tu {v} es {n} {u}?': 'Is your {v} {n} {u}?',
-  'Revisa el número': 'Check the number',
-  'Si es correcto, confírmalo; si no, corrígelo.': 'If it is correct, confirm it; if not, fix it.',
-  'Sí, es correcto': 'Yes, it is correct',
-  'Corregir': 'Fix it',
   // Código bajo el QR y programa Oncología
   'Código': 'Code',
   'Oncología': 'Oncology',

@@ -92,7 +92,7 @@ void main() {
   group('Flujo completo en modo demo (mismas formas que la API)', () {
     test('login -> plan -> registro (y reintento sin duplicar) -> tomas -> receta -> alertas', () async {
       final api = Api();
-      final l = await api.login('maria@demo.invalid', 'Demo2026!');
+      final l = await api.login('maria@demo.invalid', 'demo');
       expect(l['usuario']['rol'], 'paciente');
       await saveToken(l['token']);
       final yo = await api.yo(); expect(yo['paciente_id'], '1');
@@ -138,7 +138,7 @@ void main() {
 
     test('Equipo: tablero con semáforo y QR', () async {
       final api = Api();
-      await saveToken((await api.login('medica@demo.invalid', 'Demo2026!'))['token']);
+      await saveToken((await api.login('medica@demo.invalid', 'demo'))['token']);
       final yo = await api.yo(); expect(yo['rol'], 'equipo'); expect(yo['cedula_verificada'], true);
       final ps = await api.pacientes();
       expect(ps.first['semaforo'], 'rojo'); // rojos primero
@@ -159,7 +159,7 @@ void main() {
 
     test('flujo de herida: registrar, foto con moneda y dos toques, detalle', () async {
       final api = Api();
-      await saveToken((await api.login('maria@demo.invalid', 'Demo2026!'))['token']);
+      await saveToken((await api.login('maria@demo.invalid', 'demo'))['token']);
       final l = await api.crearLesion('1', {'tipo': 'pie_diabetico', 'zona_corporal': 'talon', 'lado': 'izquierdo'});
       expect(l['tipo'], 'pie_diabetico');
       final f = await api.subirFotoLesion('${l['id']}', bytes: Uint8List.fromList([1, 2, 3]), referencia: 'moneda_10_pesos',

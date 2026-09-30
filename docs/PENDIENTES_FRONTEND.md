@@ -144,7 +144,7 @@ Propuestas que salen del código de la app. **No son contratos**: hay que acorda
 
 | Necesidad | Por qué (app) | Propuesta |
 |---|---|---|
-| Crear cuenta | `register_screen.dart` (`_cuerpoRegistro`), `api.dart:177` | `POST /auth/registro` con `{rol: paciente\|cuidador\|medico, nombre, correo, telefono, contrasena, preferencias, …}`; paciente agrega `fecha_nacimiento, sexo, tipo_sangre, alergias, programas`; cuidador `codigo_qr`; médico `cedula, clinica`. 2xx = creada; 409 = correo ya registrado. Si no se hará, responder 404 y la app lo explica (SE1). |
+| Crear cuenta | `register_screen.dart` (`_cuerpoRegistro`), `api.dart:177` | `POST /auth/registro` con `{rol: paciente\|cuidador\|medico, nombre, correo, telefono, contrasena, preferencias, …}`; paciente agrega `fecha_nacimiento, sexo, tipo_sangre, alergias, programas`; cuidador `codigo_qr`; médico `cedula_profesional, clinica`. 2xx = creada; 409 = correo ya registrado. Si no se hará, responder 404 y la app lo explica (SE1). |
 | Plan de control | `plan_control_screen.dart` (PA1) | `GET/PUT /pacientes/:id/plan` con `rangos: [{variable, activo, frecuencia: diaria\|dos_al_dia\|semanal, min, max, min2?, max2?, meta?}]` (presión: `min/max` sistólica, `min2/max2` diastólica). La app también lee `minimo/maximo/valor_min/valor_max`. |
 | Registro de cuidador por QR | `register_screen.dart:191` | `GET /registro/qr/:codigo` sin sesión, con datos mínimos (nombre corto y cuidador asignado). |
 | Editar perfil y foto | `editar_perfil_screen.dart:29-30`, `avatar_perfil.dart:56-63` | `PATCH /auth/yo`, `PATCH /pacientes/:id`, `POST /auth/yo/foto`. |

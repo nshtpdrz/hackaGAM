@@ -1,0 +1,4 @@
+{
+  "API_URL": "https://<servidor-de-la-guia>/api/v1",
+  "DEMO_PASSWORD": "<contraseña de la guía de integración>"
+}

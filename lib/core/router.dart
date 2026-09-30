@@ -54,6 +54,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/alerta/:id', builder: (_, st) => AlertaDetalleScreen(alerta: st.extra as Map)),
       GoRoute(path: '/receta', builder: (_, __) => const RecetaFlowScreen()),
       GoRoute(path: '/pendientes', builder: (_, __) => const PendientesScreen()),
+      GoRoute(path: '/diagnostico', builder: (_, __) => const DiagnosticoScreen()),
       GoRoute(path: '/paciente/:id', builder: (_, st) => PacienteDetalleScreen(id: st.pathParameters['id']!)),
       GoRoute(path: '/alta', builder: (_, __) => const AltaPacienteScreen()),
       GoRoute(path: '/heridas', builder: (_, __) => const HeridasScreen()),

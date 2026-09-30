@@ -73,12 +73,14 @@ Future<void> cambiarFotoPerfil(BuildContext c, WidgetRef ref, {required bool tie
 
 /// Insignia del médico: verificado (cédula validada por la API) o en revisión.
 class InsigniaMedico extends StatelessWidget {
-  final bool verificado; const InsigniaMedico({super.key, required this.verificado});
+  final bool verificado, porClinica;
+  const InsigniaMedico({super.key, required this.verificado, this.porClinica = false});
   @override
   Widget build(BuildContext c) {
     final (col, ic, txt) = verificado
         ? (C.info, Icons.verified, tr('Médico verificado')) : (C.text2, Icons.hourglass_top, tr('Cédula en revisión'));
-    return Tooltip(message: verificado ? tr('Cédula profesional validada') : tr('Tu cédula profesional se está verificando'),
+    return Tooltip(message: !verificado ? tr('Tu cédula profesional se está verificando')
+        : porClinica ? tr('Cédula profesional registrada por tu clínica') : tr('Cédula profesional validada'),
       child: Semantics(label: txt, child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(color: col.withValues(alpha: .12), borderRadius: BorderRadius.circular(999),
           border: Border.all(color: col, width: 1.5)),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme.dart';
+import '../../core/validacion.dart';
+import '../../core/api_modelos.dart' show programaApi;
 import '../../widgets/components.dart';
 import '../shared.dart';
 import '../../core/tr.dart';
@@ -26,18 +29,20 @@ class DatosPerfil {
   void dispose() { for (final c in [nombre, correo, telefono]) { c.dispose(); } }
 
   String? validar({required bool paciente}) {
-    if (nombre.text.trim().isEmpty) return tr('Escribe tu nombre.');
-    if (!correo.text.contains('@')) return tr('Escribe un correo válido.');
-    if (paciente && (nacimiento == null || sexo == null || programas.isEmpty)) {
-      return tr('Completa fecha de nacimiento, sexo y programa de cuidado.'); }
-    return null;
+    final e = validarNombre(nombre.text) ?? validarCorreo(correo.text) ?? validarTelefono(telefono.text);
+    if (e != null || !paciente) return e;
+    if (sexo == null) return tr('Elige el sexo.');
+    return validarNacimiento(nacimiento) ?? validarProgramas(programas, sexo: sexo, nacimiento: nacimiento);
   }
 
-  /// Datos de la cuenta (todos los roles).
-  Map<String, dynamic> contacto() => {'nombre': nombre.text.trim(), 'correo': correo.text.trim(), 'telefono': telefono.text.trim()};
+  /// Datos de la cuenta (todos los roles). Nombre sin espacios dobles, correo en minúsculas, teléfono solo dígitos.
+  Map<String, dynamic> contacto() => {'nombre': nombre.text.trim().replaceAll(RegExp(r'\s+'), ' '),
+    'correo': correo.text.trim().toLowerCase(), 'telefono': soloDigitos(telefono.text)};
   /// Datos clínicos básicos (solo paciente).
+  /// Los programas van con el nombre del servidor (cronicas, embarazo_puerperio…), igual que en POST /pacientes.
   Map<String, dynamic> clinicos() => {'fecha_nacimiento': nacimiento!.toIso8601String().substring(0, 10),
-    'sexo': sexo, 'tipo_sangre': sangre, 'alergias': [...alergias], 'programas': programas.toList(),
+    'sexo': sexo, if (sangre != null && sangre != 'No sé') 'tipo_sangre': sangre, 'alergias': [...alergias],
+    'programas': [for (final p in programas) {'programa': programaApi(p)}],
     if (programas.contains('embarazo')) 'etapa_embarazo': etapaEmbarazo};
 }
 
@@ -52,10 +57,12 @@ class _DatosPerfilFormState extends State<DatosPerfilForm> {
   Widget build(BuildContext c) {
     final d = widget.datos;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      AppField(d.nombre, tr('Nombre completo')),
-      AppField(d.correo, tr('Correo electrónico'), kt: TextInputType.emailAddress),
+      AppField(d.nombre, tr('Nombre completo'), maxLength: 100, autofill: const [AutofillHints.name]),
+      AppField(d.correo, tr('Correo electrónico'), kt: TextInputType.emailAddress, maxLength: 254,
+        autofill: const [AutofillHints.email], formatos: [FilteringTextInputFormatter.deny(RegExp(r'\s'))]),
       ...widget.despuesDeCorreo,
-      AppField(d.telefono, tr('Teléfono'), kt: TextInputType.phone),
+      AppField(d.telefono, tr('Teléfono (10 dígitos, opcional)'), kt: TextInputType.phone, maxLength: 16,
+        autofill: const [AutofillHints.telephoneNumber], formatos: [FilteringTextInputFormatter.allow(RegExp(r'[\d +()-]'))]),
       if (widget.paciente) ...[
         SectionLabel(tr('Fecha de nacimiento')),
         OutlinedButton.icon(icon: const Icon(Icons.calendar_today), label: Text(d.nacimiento == null ? tr('Elegir fecha') : fmtFecha(d.nacimiento!)),
@@ -147,7 +154,7 @@ class _OtroMedicamentoDialogState extends State<_OtroMedicamentoDialog> {
   @override
   Widget build(BuildContext c) => DialogoAdaptable(
     titulo: Text(tr('Otro medicamento')),
-    contenido: TextField(controller: _ctl, autofocus: true, textCapitalization: TextCapitalization.sentences,
+    contenido: TextField(controller: _ctl, autofocus: true, textCapitalization: TextCapitalization.sentences, maxLength: 60,
       decoration: InputDecoration(labelText: tr('Nombre del medicamento')), onSubmitted: (v) => Navigator.pop(c, v)),
     acciones: [TextButton(style: estiloBotonDialogo, onPressed: () => Navigator.pop(c), child: Text(tr('Cancelar'))),
       FilledButton(style: estiloBotonDialogo, onPressed: () => Navigator.pop(c, _ctl.text), child: Text(tr('Agregar')))]);

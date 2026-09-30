@@ -1,5 +1,6 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../core/l10n.dart';
@@ -179,11 +180,32 @@ class _Opcion extends StatelessWidget {
 
 class AppField extends StatelessWidget {
   final TextEditingController ctl; final String label; final bool obscure, readOnly; final TextInputType? kt;
-  const AppField(this.ctl, this.label, {super.key, this.obscure = false, this.readOnly = false, this.kt});
+  final List<TextInputFormatter>? formatos; final int? maxLength; final Iterable<String>? autofill; final String? ayuda;
+  const AppField(this.ctl, this.label, {super.key, this.obscure = false, this.readOnly = false, this.kt,
+    this.formatos, this.maxLength, this.autofill, this.ayuda});
   @override
   Widget build(BuildContext c) => Padding(padding: const EdgeInsets.only(bottom: 16), child: TextField(
-      controller: ctl, obscureText: obscure, readOnly: readOnly, keyboardType: kt,
-      decoration: InputDecoration(labelText: tr(label))));
+      controller: ctl, obscureText: obscure, readOnly: readOnly, keyboardType: kt, inputFormatters: formatos,
+      maxLength: maxLength, autofillHints: autofill, autocorrect: !obscure, enableSuggestions: !obscure,
+      decoration: InputDecoration(labelText: tr(label), helperText: ayuda, helperMaxLines: 3, counterText: '')));
+}
+
+/// Campo de contraseña con botón para mostrarla u ocultarla (ayuda a quien escribe con dificultad).
+class CampoContrasena extends StatefulWidget {
+  final TextEditingController ctl; final String label; final bool nueva; final String? ayuda; final ValueChanged<String>? alEnviar;
+  const CampoContrasena(this.ctl, this.label, {super.key, this.nueva = false, this.ayuda, this.alEnviar});
+  @override State<CampoContrasena> createState() => _CampoContrasenaState();
+}
+class _CampoContrasenaState extends State<CampoContrasena> {
+  bool _ver = false;
+  @override
+  Widget build(BuildContext c) => Padding(padding: const EdgeInsets.only(bottom: 16), child: TextField(
+    controller: widget.ctl, obscureText: !_ver, autocorrect: false, enableSuggestions: false, maxLength: 72,
+    autofillHints: [widget.nueva ? AutofillHints.newPassword : AutofillHints.password],
+    textInputAction: widget.alEnviar == null ? TextInputAction.next : TextInputAction.done, onSubmitted: widget.alEnviar,
+    decoration: InputDecoration(labelText: tr(widget.label), helperText: widget.ayuda, helperMaxLines: 3, counterText: '',
+      suffixIcon: IconButton(tooltip: _ver ? tr('Ocultar contraseña') : tr('Mostrar contraseña'),
+        icon: Icon(_ver ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => _ver = !_ver)))));
 }
 
 class SectionLabel extends StatelessWidget {

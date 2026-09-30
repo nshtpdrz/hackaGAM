@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api.dart';
 import '../../core/api_modelos.dart';
 import '../../core/sync.dart';
+import '../../core/validacion.dart';
 import '../../core/state.dart';
 import '../../core/theme.dart';
 import '../../widgets/components.dart';
@@ -21,7 +23,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
 class _RegisterState extends ConsumerState<RegisterScreen> {
   Role _role = Role.paciente;
-  final _p = TextEditingController(), _cedula = TextEditingController(), _clinica = TextEditingController();
+  final _p = TextEditingController(), _p2 = TextEditingController(), _cedula = TextEditingController(), _clinica = TextEditingController();
 
   // Cuidador: resultado de escanear el QR del paciente ({codigo, paciente, cuidador_asignado}).
   Map<String, dynamic>? _vinculo;
@@ -31,7 +33,7 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
   final _datos = DatosPerfil()..programas.add('cronico');
 
   @override
-  void dispose() { for (final x in [_p, _cedula, _clinica]) { x.dispose(); } _datos.dispose(); super.dispose(); }
+  void dispose() { for (final x in [_p, _p2, _cedula, _clinica]) { x.dispose(); } _datos.dispose(); super.dispose(); }
 
   String? _err;
   bool _busy = false;
@@ -91,7 +93,9 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
               key: ValueKey(_role),
               datos: _datos,
               paciente: _role == Role.paciente,
-              despuesDeCorreo: [AppField(_p, t('login.pass').text, obscure: true)],
+              despuesDeCorreo: [
+                CampoContrasena(_p, t('login.pass').text, nueva: true, ayuda: tr('Mínimo 8 caracteres, con letras y números.')),
+                CampoContrasena(_p2, tr('Repite la contraseña'), nueva: true)],
             ),
 
             // Campos adaptativos según el Rol seleccionado
@@ -99,8 +103,9 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 8),
               _pacienteACargo(c),
             ] else if (_role == Role.equipo) ...[
-              AppField(_cedula, tr('Cédula profesional'), kt: TextInputType.number),
-              TextField(controller: _clinica, decoration: InputDecoration(labelText: tr('Clínica o Institución médica'))),
+              AppField(_cedula, tr('Cédula profesional'), kt: TextInputType.number, maxLength: 8,
+                formatos: [FilteringTextInputFormatter.digitsOnly], ayuda: tr('7 u 8 dígitos, como aparece en el Registro Nacional de Profesionistas.')),
+              AppField(_clinica, tr('Clínica o Institución médica'), maxLength: 120),
               const SizedBox(height: 8),
               Text(tr('Validaremos tu cédula. Mientras tanto tu perfil mostrará "Cédula en revisión".')),
             ],
@@ -127,9 +132,10 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
   onTap: _busy
       ? null
       : () async {
-          // 1. Validación de campos obligatorios
+          // 1. Validación de campos obligatorios y de la contraseña
           final e = _datos.validar(paciente: _role == Role.paciente)
-              ?? (_p.text.length < 8 ? tr('La contraseña debe tener al menos 8 caracteres.') : null)
+              ?? validarContrasenaNueva(_p.text)
+              ?? (_p.text != _p2.text ? tr('Las contraseñas no coinciden.') : null)
               ?? _validarRol();
           if (e != null) {
             setState(() => _err = e);
@@ -139,22 +145,24 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
           setState(() { _busy = true; _err = null; });
 
           try {
-            // 2. POST /auth/registro (propuesta para backend en docs/PENDIENTES_FRONTEND.md). Solo con 2xx se
-            // dice que la cuenta quedó creada. La accesibilidad ya quedó aplicada en prefsProvider.
+            // 2. POST /auth/registro. La accesibilidad ya quedó aplicada en prefsProvider al mover el interruptor.
             await ref.read(apiProvider).registro(_cuerpoRegistro(ref.read(prefsProvider)));
             if (!c.mounted) return;
+            // 3. Solo se anuncia éxito si el servidor creó la cuenta.
             ScaffoldMessenger.of(c).showSnackBar(SnackBar(
-                content: Text(tr('¡Registro exitoso! Por favor inicia sesión.')), backgroundColor: C.success));
+              content: Text(_role == Role.equipo ? tr('Cuenta creada. Tu cédula quedará en revisión. Inicia sesión.')
+                  : tr('¡Registro exitoso! Por favor inicia sesión.')),
+              backgroundColor: C.success));
             // Regresa al inicio de sesión (abierto encima de él o directo en /registro).
-            if (Navigator.of(c).canPop()) { Navigator.of(c).pop(); } else { c.go('/login'); }
+            final router = GoRouter.maybeOf(c);
+            if (!Navigator.of(c).canPop() && router != null) { router.go('/login'); } else { Navigator.of(c).pop(); }
           } catch (e) {
             if (!mounted) return;
-            // 404/405: el servidor aún no permite crear cuentas desde la app.
-            final estado = errorApi(e)?.estado;
-            setState(() => _err = estado == 404 || estado == 405 || estado == 501
-                ? tr('Por ahora las cuentas las crea tu equipo de salud. Pídeles tu usuario y contraseña.')
-                : isNetworkError(e) ? tr('Sin conexión. Revisa tu internet e intenta de nuevo.')
-                : estado == 409 ? tr('Ya existe una cuenta con ese correo. Inicia sesión.')
+            final x = errorApi(e);
+            setState(() => _err = isNetworkError(e) ? tr('Sin conexión. El registro necesita internet.')
+                // La guía de la API no incluye registro abierto: las cuentas las crea la clínica.
+                : x?.estado == 404 || x?.estado == 405 || x?.estado == 501 ? tr('El registro en línea aún no está disponible. Pide tu cuenta a tu clínica.')
+                : x?.estado == 409 ? tr('Ya existe una cuenta con ese correo. Inicia sesión o recupera tu contraseña.')
                 : mensajeError(e) ?? tr('Error al registrar la cuenta'));
           } finally {
             if (mounted) setState(() => _busy = false);
@@ -173,20 +181,20 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  /// Cuerpo de POST /auth/registro. rol: paciente | cuidador | medico.
+  /// Cuerpo de POST /auth/registro (no está en la guía de la API; propuesta en docs/SOLICITUDES_BACKEND.md).
   Map<String, dynamic> _cuerpoRegistro(Prefs p) => {
-    'rol': switch (_role) { Role.paciente => 'paciente', Role.cuidador => 'cuidador', Role.equipo => 'medico' },
     ..._datos.contacto(), 'contrasena': _p.text,
+    'rol': switch (_role) { Role.paciente => 'paciente', Role.cuidador => 'cuidador', Role.equipo => 'medico' },
     if (_role == Role.paciente) ..._datos.clinicos(),
     if (_role == Role.cuidador) 'codigo_qr': _vinculo?['codigo'],
-    if (_role == Role.equipo) ...{'cedula': _cedula.text.trim(), 'clinica': _clinica.text.trim()},
+    if (_role == Role.equipo) ...{'cedula_profesional': _cedula.text.trim(), 'clinica': _clinica.text.trim()},
     'preferencias': p.toJson()};
 
   /// Médico: cédula (7 u 8 dígitos) y clínica. Cuidador: QR de un paciente que lo tenga asignado.
   String? _validarRol() {
     if (_role == Role.equipo) {
-      if (!RegExp(r'^\d{7,8}$').hasMatch(_cedula.text.trim())) return tr('La cédula profesional debe tener 7 u 8 dígitos.');
-      if (_clinica.text.trim().isEmpty) return tr('Escribe tu clínica o institución médica.');
+      final e = validarCedula(_cedula.text); if (e != null) return e;
+      if (_clinica.text.trim().length < 3) return tr('Escribe tu clínica o institución médica.');
     }
     if (_role == Role.cuidador && _vinculo?['cuidador_asignado'] == null) {
       return tr('Escanea el QR de un paciente que te tenga asignado como cuidador.');

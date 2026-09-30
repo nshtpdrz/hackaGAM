@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'validacion.dart';
 import 'api_modelos.dart';
 import 'mock_api.dart';
 
@@ -78,7 +79,7 @@ class Api {
       normalizarPacientes(await _todas('/pacientes', {'q': q, 'semaforo': semaforo, 'programa': programa, 'limite': 50},
           claves: ['pacientes'], maxPaginas: 4));
   /// Alta (enfermera, médico): devuelve paciente + codigo_qr + credenciales temporales (una sola vez).
-  Future<Map<String, dynamic>> crearPaciente(Map<String, dynamic> datos, {String? versionAviso}) async {
+  Future<Map<String, dynamic>> crearPaciente(Map<String, dynamic> datos, {required String versionAviso}) async {
     final r = await _post('/pacientes', altaPacienteParaApi(datos, versionAviso: versionAviso));
     return {...(r is Map ? r.cast<String, dynamic>() : {}), ...normalizarPaciente(r), 'codigo_qr': normalizarQr(r)['token']};
   }
@@ -164,7 +165,7 @@ class Api {
   Future<Map<String, dynamic>> qr(String id) async => normalizarQr(await _get('/pacientes/$id/qr'));
   /// Equipo: paciente identificado por su QR (queda en bitácora).
   Future<Map<String, dynamic>> qrCodigo(String codigo) async {
-    final r = await _get('/qr/$codigo');
+    final r = await _get('/qr/${_codigoSeguro(codigo)}');
     return {'paciente_id': pacienteDeQr(r), 'paciente': normalizarPaciente(r)};
   }
   Future<List<Map<String, dynamic>>> alertas({String estado = 'abierta'}) async =>
@@ -178,9 +179,22 @@ class Api {
   Future<dynamic> actualizarYo(Map<String, dynamic> b) => _patch('/auth/yo', b);
   Future<dynamic> subirFotoPerfil(Uint8List bytes, String nombre) =>
       _post('/auth/yo/foto', FormData.fromMap({'foto': MultipartFile.fromBytes(bytes, filename: nombre)}));
-  Future<dynamic> qrRegistro(String codigo) => _get('/registro/qr/$codigo');
+  Future<dynamic> qrRegistro(String codigo) => _get('/registro/qr/${_codigoSeguro(codigo)}');
+
+  /// El contenido de un QR es dato externo: solo se acepta el formato de los códigos de la app y se codifica,
+  /// para que un QR falso no pueda apuntar a otra ruta de la API con la sesión de quien lo escanea.
+  static String _codigoSeguro(String codigo) {
+    final c = codigo.trim();
+    if (!codigoQrValido(c)) throw ArgumentError.value(codigo, 'codigo', 'QR con formato no válido');
+    return Uri.encodeComponent(c);
+  }
   Future<dynamic> clinicas() => _get('/clinicas');
   Future<dynamic> actualizarPaciente(String id, Map<String, dynamic> b) => _patch('/pacientes/$id', b);
+
+  /// Solo para la pantalla "Diagnóstico de conexión": GET sin normalizar. Un estado no 2xx no lanza error
+  /// (tampoco cierra la sesión por 401); se devuelve la respuesta tal cual para describir su forma.
+  Future<Response<dynamic>> crudo(String ruta, [Map<String, dynamic>? q]) =>
+      _d.get(ruta, queryParameters: q?..removeWhere((_, v) => v == null), options: Options(validateStatus: (_) => true));
 }
 
 final apiProvider = Provider<Api>((_) => Api());
