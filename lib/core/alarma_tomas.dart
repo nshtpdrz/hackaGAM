@@ -27,7 +27,10 @@ class TomasLocales extends StateNotifier<Map<String, EstadoLocal>> {
   void omitida(Object? id) => state = {...state, '$id': EstadoLocal('omitida')};
   void pospuesta(Object? id, Duration en) => state = {...state, '$id': EstadoLocal('pospuesta', hasta: DateTime.now().add(en))};
 }
-final tomasLocalesProvider = StateNotifierProvider<TomasLocales, Map<String, EstadoLocal>>((_) => TomasLocales());
+final tomasLocalesProvider = StateNotifierProvider<TomasLocales, Map<String, EstadoLocal>>((ref) {
+  ref.watch(sessionProvider.select((s) => s?.userId)); // se reinicia al cambiar de cuenta
+  return TomasLocales();
+});
 
 /// Horarios con el estado respondido hoy en este teléfono encima del de la API.
 List<Map> conEstadoLocal(List horarios, Map<String, EstadoLocal> locales, [DateTime? ahora]) {

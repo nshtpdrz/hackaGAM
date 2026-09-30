@@ -13,13 +13,13 @@ import 'package:medmap/widgets/avisos_settings.dart';
 class _Ses extends SessionNotifier { _Ses(super.ref, Role r) { state = Session('t', 'u', r, '1', rolApi: r.name); } }
 
 Future<void> _fuentes() async {
-  const mf = 'C:/flutter/bin/cache/artifacts/material_fonts';
+  final mf = '${Platform.environment['FLUTTER_ROOT'] ?? 'C:/flutter'}/bin/cache/artifacts/material_fonts';
   final roboto = FontLoader('Roboto');
-  for (final f in ['roboto-regular.ttf', 'roboto-medium.ttf', 'roboto-bold.ttf']) {
+  for (final f in ['Roboto-Regular.ttf', 'Roboto-Medium.ttf', 'Roboto-Bold.ttf']) {
     roboto.addFont(File('$mf/$f').readAsBytes().then((b) => ByteData.view(b.buffer)));
   }
   await roboto.load();
-  final iconos = FontLoader('MaterialIcons')..addFont(File('$mf/materialicons-regular.otf').readAsBytes().then((b) => ByteData.view(b.buffer)));
+  final iconos = FontLoader('MaterialIcons')..addFont(File('$mf/MaterialIcons-Regular.otf').readAsBytes().then((b) => ByteData.view(b.buffer)));
   await iconos.load();
 }
 

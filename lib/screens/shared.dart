@@ -58,7 +58,7 @@ String pid(WidgetRef r) => _pidFrom(r.read(sessionProvider)!);
 /// Consultas GET compartidas por clave. Conectar aquí cada endpoint nuevo.
 final futureFor = FutureProvider.family<dynamic, String>((ref, key) {
   final a = ref.read(apiProvider); final s = ref.read(sessionProvider)!;
-  ref.watch(sessionProvider.select((s) => s?.patientId)); // se recarga al cambiar de paciente
+  ref.watch(sessionProvider.select((s) => (s?.userId, s?.patientId))); // se recarga al cambiar de cuenta o de paciente
   final id = _pidFrom(s);
   return switch (key) { 'plan' => a.plan(id), 'horarios' => a.horarios(id), 'meds' => a.medicamentos(id),
     'qr' => a.qr(id), 'perfil' => s.role == Role.paciente ? a.paciente(id) : a.yo(),
@@ -66,7 +66,10 @@ final futureFor = FutureProvider.family<dynamic, String>((ref, key) {
 });
 
 /// Historial de mediciones (180 días) de un paciente. Lo usan el propio paciente, su cuidador y el médico.
-final historialProvider = FutureProvider.family<dynamic, String>((ref, id) => ref.read(apiProvider).registros(id, dias: 180));
+final historialProvider = FutureProvider.family<dynamic, String>((ref, id) {
+  ref.watch(sessionProvider.select((s) => s?.userId)); // otra cuenta no ve lo que cargó la anterior
+  return ref.read(apiProvider).registros(id, dias: 180);
+});
 
 /// Programas de cuidado: clave (dato) -> nombre en el idioma actual.
 Map<String, String> get programasCuidado =>

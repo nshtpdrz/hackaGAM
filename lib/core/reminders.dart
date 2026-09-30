@@ -99,6 +99,19 @@ Future<void> _crearCanalAlertas() async {
       description: tr('Avisos del equipo de salud y de tus familiares.'), importance: Importance.high));
 }
 
+/// Cambió el idioma de la app: Android actualiza el nombre de los canales al volver a crearlos con el mismo id,
+/// y las alarmas se reprograman con los botones ("Ya la tomé", "Más tarde") en el idioma nuevo.
+Future<void> actualizarIdiomaAvisos() async {
+  _firma = '';
+  if (kIsWeb || !_iniciado) return;
+  try {
+    await _crearCanalAlertas();
+    await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(
+      AndroidNotificationChannel('alarma_tomas', tr('Alarma de medicamentos'),
+        description: tr('Suena y vibra a la hora de cada toma hasta que respondas.'), importance: Importance.max));
+  } catch (_) {}
+}
+
 /// Pide permiso para mostrar notificaciones (Android 13+ e iOS). Se llama al iniciar sesión.
 Future<bool> pedirPermisoNotificaciones() async {
   if (kIsWeb) return false;
@@ -162,35 +175,6 @@ Future<void> mostrarPush(int id, String titulo, String cuerpo, Map<String, dynam
         iOS: const DarwinNotificationDetails(presentAlert: true, presentBanner: true, presentSound: true)),
       payload: jsonEncode({_clavePush: datos}));
   } catch (_) {}
-}
-
-int _id(String key, int i) => (key.hashCode.abs() % 100000) * 10 + i;
-
-Future<void> _programar(int id, String titulo, String cuerpo, DateTime cuando, AndroidScheduleMode modo) =>
-  _plugin.zonedSchedule(id, titulo, cuerpo, tz.TZDateTime.from(cuando, tz.UTC),
-    NotificationDetails(
-      android: AndroidNotificationDetails('tomas', tr('Recordatorios de toma'), importance: Importance.high, priority: Priority.high,
-        icon: _icono, color: _morado),
-      iOS: const DarwinNotificationDetails()),
-    androidScheduleMode: modo,
-    uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-    matchDateTimeComponents: DateTimeComponents.time); // se repite todos los días a esa hora
-
-/// Programa recordatorios diarios locales (funcionan sin internet). Devuelve false si no se pudo.
-Future<bool> scheduleMedReminders(String key, String titulo, String cuerpo, List<String> horarios) async {
-  if (kIsWeb) return false;
-  try {
-    for (var i = 0; i < 10; i++) { await _plugin.cancel(_id(key, i)); }
-    final now = DateTime.now();
-    for (var i = 0; i < horarios.length && i < 10; i++) {
-      final h = parseHora(horarios[i]);
-      var t = DateTime(now.year, now.month, now.day, h.hour, h.minute);
-      if (!t.isAfter(now)) t = t.add(const Duration(days: 1));
-      try { await _programar(_id(key, i), titulo, cuerpo, t, AndroidScheduleMode.exactAllowWhileIdle); }
-      catch (_) { await _programar(_id(key, i), titulo, cuerpo, t, AndroidScheduleMode.inexactAllowWhileIdle); }
-    }
-    return true;
-  } catch (_) { return false; }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -276,4 +260,12 @@ Future<void> atenderAlarma(Map toma) async {
       await _agendar(_baseDiaria + _k(toma), toma, _proxima('${toma['hora']}'), diaria: true);
     }
   } catch (_) {}
+}
+
+/// Al cerrar sesión: quita todas las alarmas y avisos de SENDA de este teléfono (programados y visibles),
+/// para que no suenen las tomas de una persona en la sesión de otra.
+Future<void> cancelarAlarmasTomas() async {
+  _firma = '';
+  if (kIsWeb) return;
+  try { await _plugin.cancelAll(); } catch (_) {}
 }

@@ -59,9 +59,9 @@ Session? sesion(Role? r) => r == null ? null : Session('t', 'u', r, '1', rolApi:
     pacientesACargo: const [{'id': '1', 'nombre': 'María Demo López'}, {'id': '3', 'nombre': 'Carmen Demo Sánchez'}]);
 
 void main() {
-  setUpAll(() async { const mf = 'C:/flutter/bin/cache/artifacts/material_fonts';
-    await _f('Roboto', ['$mf/roboto-regular.ttf', '$mf/roboto-medium.ttf', '$mf/roboto-bold.ttf']);
-    await _f('MaterialIcons', ['$mf/materialicons-regular.otf']); });
+  setUpAll(() async { final mf = '${Platform.environment['FLUTTER_ROOT'] ?? 'C:/flutter'}/bin/cache/artifacts/material_fonts';
+    await _f('Roboto', ['$mf/Roboto-Regular.ttf', '$mf/Roboto-Medium.ttf', '$mf/Roboto-Bold.ttf']);
+    await _f('MaterialIcons', ['$mf/MaterialIcons-Regular.otf']); });
 
   const escalaPct = int.fromEnvironment('ESCALA', defaultValue: 200);
   final escala = escalaPct / 100;

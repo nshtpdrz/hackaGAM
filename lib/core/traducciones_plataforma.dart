@@ -47,4 +47,8 @@ const Map<String, Map<String, String>> traduccionesPlataforma = {'en': {
   'En este teléfono activa también "Inicio automático" para SENDA.': 'On this phone also turn on "Autostart" for SENDA.',
   'Abrir ajustes': 'Open settings',
   'Falta': 'Missing',
+  // Cola sin conexión (lib/core/sync.dart, pendientes_screen.dart)
+  'No se pudieron enviar': 'Could not be sent',
+  'Descartar': 'Discard',
+  'Algunos datos no se pudieron enviar': 'Some data could not be sent',
 }};

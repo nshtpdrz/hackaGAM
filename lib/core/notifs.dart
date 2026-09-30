@@ -4,7 +4,7 @@ import 'state.dart';
 import 'tr.dart';
 
 /// Leídas/no leídas (local). Las notificaciones se derivan de /alertas y /pacientes/:id/horarios.
-final leidasProvider = StateProvider<Set<String>>((_) => {});
+final leidasProvider = StateProvider<Set<String>>((ref) { ref.watch(sessionProvider.select((s) => s?.userId)); return {}; });
 
 final notificacionesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final s = ref.watch(sessionProvider); if (s == null) return [];

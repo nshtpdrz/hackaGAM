@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'almacen_local.dart';
 import 'api.dart';
 import 'api_modelos.dart';
 import 'l10n.dart';
 import 'mock_api.dart';
 import 'push.dart';
+import 'reminders.dart';
 
 enum Role { paciente, cuidador, equipo }
 
@@ -32,14 +34,29 @@ class Prefs {
       textScale: j['letra'] == null && j['tamano_letra'] == null ? null : escalaLetra(j['letra'] ?? j['tamano_letra'], base.textScale));
   Map<String, dynamic> toJson() => {'lengua': lenguaApi[lang] ?? lang, 'variante': variant, 'prefiere_audio': audio,
       'letra': letraApi(textScale), 'contraste': highContrast ? 'alto' : 'normal'};
+  /// Copia completa para guardar en el teléfono (incluye lo que la API no tiene).
+  Map<String, dynamic> toLocal() => {'lang': lang, 'variant': variant, 'audio': audio, 'pictograms': pictograms,
+      'highContrast': highContrast, 'bigButtons': bigButtons, 'textScale': textScale};
+  static Prefs fromLocal(Object? j) {
+    if (j is! Map) return const Prefs();
+    T? v<T>(String k) => j[k] is T ? j[k] as T : null;
+    return const Prefs().copy(lang: v<String>('lang'), variant: v<String>('variant'), audio: v<bool>('audio'),
+        pictograms: v<bool>('pictograms'), highContrast: v<bool>('highContrast'), bigButtons: v<bool>('bigButtons'),
+        textScale: (j['textScale'] as num?)?.toDouble());
+  }
 }
+/// Preferencias de este teléfono. main() las lee de [almacen] antes de arrancar y se guardan en cada cambio.
 final prefsProvider = StateProvider<Prefs>((_) => const Prefs());
+const clavePrefs = 'senda.prefs';
+Future<Prefs> leerPrefsGuardadas() async => Prefs.fromLocal(await almacen.leer(clavePrefs));
+Future<void> guardarPrefs(Prefs p) => almacen.guardar(clavePrefs, p.toLocal());
 /// true cuando la API respondió 401: el login muestra "sesión expirada".
 final sessionExpiredProvider = StateProvider<bool>((_) => false);
 
 class SessionNotifier extends StateNotifier<Session?> {
   SessionNotifier(this.ref) : super(null) {
-    ref.read(apiProvider).onUnauthorized = () { ref.read(sessionExpiredProvider.notifier).state = true; logout(); };
+    // Sesión expirada: es la misma persona, así que se conservan sus alarmas y datos del teléfono.
+    ref.read(apiProvider).onUnauthorized = () { ref.read(sessionExpiredProvider.notifier).state = true; logout(expirada: true); };
   }
   final Ref ref;
   Role _role(String r) => switch (r) { 'paciente' => Role.paciente, 'cuidador' => Role.cuidador, _ => Role.equipo };
@@ -55,17 +72,37 @@ class SessionNotifier extends StateNotifier<Session?> {
     final t = await readToken(); if (t == null) return;
     final y = await ref.read(apiProvider).yo();
     final aCargo = (y['pacientes_a_cargo'] as List).cast<Map<String, dynamic>>();
-    state = Session(t, '${y['id']}', _role('${y['rol']}'), y['paciente_id']?.toString(),
+    final s = Session(t, '${y['id']}', _role('${y['rol']}'), y['paciente_id']?.toString(),
         rolApi: y['rol_api']?.toString(), pacientesACargo: aCargo);
+    // Entra otra cuenta en este teléfono (la anterior expiró sin cerrar sesión): fuera sus alarmas.
+    final anterior = await almacen.leer(_claveUltimo);
+    if (anterior != null && anterior != s.userId) await cancelarAlarmasTomas();
+    await almacen.guardar(_claveUltimo, s.userId);
+    state = s;
     ref.read(sessionExpiredProvider.notifier).state = false;
+    // Las preferencias de la API son las del paciente: solo se aplican en su propio teléfono.
     final p = y['preferencias'];
-    if (p is Map) ref.read(prefsProvider.notifier).state = Prefs.fromJson(p, ref.read(prefsProvider));
+    if (p is Map && s.role == Role.paciente) ref.read(prefsProvider.notifier).state = Prefs.fromJson(p, ref.read(prefsProvider));
   }
+  static const _claveUltimo = 'senda.ultimo_usuario';
   /// Cuidador con varios familiares: cambia el paciente que se ve en todas las pantallas.
   void elegirPaciente(String id) { final s = state; if (s != null) state = s.conPaciente(id); }
   /// Botones "Entrar como…": inician sesión con las cuentas de demo de la semilla del backend (o del mock).
   Future<void> enterDemo(Role role) => login(cuentasDemo[role.name]!, contrasenaDemo);
-  Future<void> logout() async { await saveToken(null); state = null; }
+  /// Cerrar sesión: se borra el token, se cancelan las alarmas de tomas y se borran los datos de la cuenta
+  /// guardados en el teléfono (la cola sin conexión se conserva y se envía si vuelve a entrar esa cuenta).
+  /// Los datos en memoria (consultas, tomas del día, leídas) se reinician porque dependen de [Session.userId].
+  /// Con [expirada] (401) solo se pide iniciar sesión otra vez.
+  Future<void> logout({bool expirada = false}) async {
+    final u = state?.userId;
+    await saveToken(null);
+    if (!expirada) {
+      await cancelarAlarmasTomas();
+      if (u != null) await almacen.borrarPrefijo(claveDeUsuario(u, ''));
+      await almacen.guardar(_claveUltimo, null);
+    }
+    state = null;
+  }
 }
 final sessionProvider = StateNotifierProvider<SessionNotifier, Session?>((r) => SessionNotifier(r));
 

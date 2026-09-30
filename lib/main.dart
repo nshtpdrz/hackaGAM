@@ -6,15 +6,19 @@ import 'core/push.dart';
 import 'core/reminders.dart';
 import 'core/router.dart';
 import 'core/state.dart';
+import 'core/sync.dart';
 import 'core/theme.dart';
 import 'core/tr.dart';
 import 'core/escala_texto.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Letra, contraste e idioma guardados: se aplican desde la primera pantalla (y el idioma a las alarmas).
+  final prefs = await leerPrefsGuardadas();
+  fijarIdioma(prefs.lang);
   await initReminders();
   await iniciarPush(); // sin configuración de Firebase no hace nada (docs/NOTIFICACIONES.md)
-  runApp(const ProviderScope(child: MedmapApp()));
+  runApp(ProviderScope(overrides: [prefsProvider.overrideWith((_) => prefs)], child: const MedmapApp()));
 }
 
 class MedmapApp extends ConsumerWidget {
@@ -24,6 +28,11 @@ class MedmapApp extends ConsumerWidget {
     final p = ref.watch(prefsProvider); final s = ref.watch(sessionProvider);
     fijarIdioma(p.lang); // textos de pantalla (tr) en el idioma elegido
     ref.watch(catalogLoadProvider);
+    ref.listen<Prefs>(prefsProvider, (antes, p) {
+      guardarPrefs(p);
+      if (antes?.lang != p.lang) actualizarIdiomaAvisos(); // nombres de los canales de Android en el idioma nuevo
+    });
+    ref.listen(syncProvider, (_, __) {}); // la cola sin conexión se carga y se envía desde que abre la app
     final router = ref.watch(routerProvider);
     // Ya se puede navegar desde una alarma o un push (no estamos en splash ni login).
     bool listo() {
