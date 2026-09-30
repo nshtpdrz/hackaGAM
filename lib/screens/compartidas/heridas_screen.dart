@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/api.dart';
 import '../../core/api_modelos.dart';
+import '../../core/permisos.dart';
 import '../../core/state.dart';
 import '../../core/sync.dart';
 import '../../core/theme.dart';
@@ -146,11 +147,21 @@ class _FotoHeridaState extends ConsumerState<FotoHeridaScreen> {
   String referencia = 'moneda_10_pesos'; Uint8List? bytes; Size? tamano; Offset? toqueRef, toqueLesion;
   bool busy = false; String? err; Map<String, dynamic>? resultado;
 
+  @override
+  void initState() {
+    super.initState();
+    // Si Android cerró SENDA con la cámara abierta, la foto que se tomó se recupera aquí.
+    fotoPerdida().then((f) { if (f != null) _usar(f); });
+  }
+
   Future<void> _tomar(ImageSource s) async {
-    final f = await ImagePicker().pickImage(source: s, maxWidth: 2000, imageQuality: 85); // JPEG
-    if (f == null) return;
+    final f = await elegirFoto(context, s, maxWidth: 2000, imageQuality: 85); // JPEG; sin permiso: explica y lleva a Ajustes
+    if (f != null) await _usar(f);
+  }
+  Future<void> _usar(XFile f) async {
     final b = await f.readAsBytes();
     final img = await decodeImageFromList(b); // tamaño real de la foto que se va a subir
+    if (!mounted) return;
     setState(() { bytes = b; tamano = Size(img.width.toDouble(), img.height.toDouble()); toqueRef = null; toqueLesion = null; err = null; });
   }
 

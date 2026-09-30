@@ -5,6 +5,7 @@ import '../../core/api_modelos.dart';
 import '../../core/state.dart';
 import '../../core/theme.dart';
 import '../../widgets/components.dart';
+import '../../widgets/pedir_ayuda.dart';
 import '../shared.dart';
 import '../../core/tr.dart';
 
@@ -30,7 +31,8 @@ class ResultadoScreen extends ConsumerWidget { final Map data; const ResultadoSc
         const Icon(Icons.notifications_active_outlined, color: C.error), const SizedBox(width: 12),
         Expanded(child: Text(tr('Avisamos a tu equipo de salud y a tu cuidador.')))]))),
       const SizedBox(height: 24),
-      if (!incompleta && nivel != 'verde') BigButton(ref.watch(trProvider)('help.caregiver').text, icon: Icons.phone, color: C.error),
+      if (!incompleta && nivel != 'verde') BigButton(ref.watch(trProvider)('help.caregiver').text, icon: Icons.phone, color: C.error,
+        onTap: () => pedirAyuda(c, urgente: nivel == 'rojo')),
       if (incompleta) BigButton(tr('Contestar lo que falta'), icon: Icons.edit_note, onTap: () => c.go('/registrar')),
       const SizedBox(height: 12), BigButton(tr('Listo'), secondary: true, onTap: () => c.go('/hoy'))]));
   }

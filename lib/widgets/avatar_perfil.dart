@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/api.dart';
+import '../core/permisos.dart';
 import '../core/state.dart';
 import '../core/sync.dart';
 import '../core/theme.dart';
@@ -55,8 +56,8 @@ Future<void> cambiarFotoPerfil(BuildContext c, WidgetRef ref, {required bool tie
       ref.read(fotoPerfilProvider.notifier).state = null;
       await api.actualizarYo({'foto_url': null});
     } else {
-      final x = await ImagePicker().pickImage(source: op == 'camara' ? ImageSource.camera : ImageSource.gallery,
-          maxWidth: 800, maxHeight: 800, imageQuality: 85);
+      final x = await elegirFoto(c, op == 'camara' ? ImageSource.camera : ImageSource.gallery,
+          maxWidth: 800, maxHeight: 800, imageQuality: 85); // sin permiso: explica y lleva a Ajustes
       if (x == null) return;
       final bytes = await x.readAsBytes();
       ref.read(fotoPerfilProvider.notifier).state = bytes; // se ve de inmediato

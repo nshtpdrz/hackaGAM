@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../core/permisos.dart';
 import '../core/sync.dart';
 import '../core/theme.dart';
 import '../core/tr.dart';
@@ -36,11 +38,17 @@ class _LectorQrState extends State<LectorQr> {
   Widget build(BuildContext c) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
     Expanded(child: Stack(fit: StackFit.expand, children: [
       MobileScanner(onDetect: (cap) => _procesar(cap.barcodes.firstOrNull?.rawValue),
-        errorBuilder: (_, __, ___) => ColoredBox(color: Colors.black87, child: Center(child: Padding(padding: EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.no_photography_outlined, color: Colors.white, size: 48), SizedBox(height: 12),
-            Text(tr('No se pudo abrir la cámara. Usa "Escribir código".'), textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white, fontSize: 16))]))))),
+        errorBuilder: (_, e, __) {
+          final permiso = e.errorCode == MobileScannerErrorCode.permissionDenied;
+          return ColoredBox(color: Colors.black87, child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.no_photography_outlined, color: Colors.white, size: 48), const SizedBox(height: 12),
+              Text(permiso ? tr('SENDA no tiene permiso de usar la cámara. Permítelo en Ajustes o usa "Escribir código".')
+                  : tr('No se pudo abrir la cámara. Usa "Escribir código".'), textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 16)),
+              if (permiso && !kIsWeb) Padding(padding: const EdgeInsets.only(top: 12), child: FilledButton.icon(
+                onPressed: abrirAjustesDeLaApp, icon: const Icon(Icons.settings), label: Text(tr('Ir a Ajustes'))))]))));
+        }),
       IgnorePointer(child: Center(child: Container(width: 240, height: 240, decoration: BoxDecoration(
         border: Border.all(color: Colors.white, width: 3), borderRadius: BorderRadius.circular(16))))),
       if (busy) const ColoredBox(color: Colors.black38, child: Center(child: CircularProgressIndicator()))])),

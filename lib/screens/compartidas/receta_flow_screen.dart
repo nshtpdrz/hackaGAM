@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/api.dart';
 import '../../core/api_modelos.dart';
+import '../../core/permisos.dart';
 import '../../core/reminders.dart';
 import '../../core/sync.dart';
 import '../../core/theme.dart';
@@ -25,15 +26,21 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
   Map? doc; List<Map<String, dynamic>> meds = [];
   final _texto = TextEditingController();
   @override
+  void initState() {
+    super.initState();
+    // Si Android cerró SENDA con la cámara abierta, la foto que se tomó se recupera aquí.
+    fotoPerdida().then((f) async { if (f != null) _usar(await f.readAsBytes()); });
+  }
+  @override
   void dispose() { _texto.dispose(); super.dispose(); }
 
   Future<void> _foto(ImageSource s) async {
     // Guía: JPEG con calidad 85 y máximo 2000 px (evita HEIC, que la IA no acepta, y baja tiempo y costo).
-    final f = await ImagePicker().pickImage(source: s, maxWidth: 2000, imageQuality: 85);
+    final f = await elegirFoto(context, s, maxWidth: 2000, imageQuality: 85); // sin permiso: explica y lleva a Ajustes
     if (f == null) return;
-    final b = await f.readAsBytes(); // bytes: funciona igual en teléfono y en web
-    setState(() { foto = b; fotoNombre = 'receta.jpg'; err = null; });
+    _usar(await f.readAsBytes()); // bytes: funciona igual en teléfono y en web
   }
+  void _usar(Uint8List b) { if (mounted) setState(() { foto = b; fotoNombre = 'receta.jpg'; err = null; }); }
   bool get _listo => foto != null || (escribir && _texto.text.trim().isNotEmpty);
   Future<void> _procesar() async {
     setState(() { paso = 1; err = null; });

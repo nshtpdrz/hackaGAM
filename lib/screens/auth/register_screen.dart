@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/api.dart';
+import '../../core/api_modelos.dart';
+import '../../core/sync.dart';
 import '../../core/state.dart';
 import '../../core/theme.dart';
 import '../../widgets/components.dart';
@@ -136,24 +139,23 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
           setState(() { _busy = true; _err = null; });
 
           try {
-            // 2. La accesibilidad ya quedó aplicada en prefsProvider al mover el interruptor.
-            // TODO: Aquí realizarás la llamada al endpoint POST /auth/registro cuando esté el backend listo
-            // await ref.read(apiProvider).registrarUsuario(...);
-
-            if (mounted) {
-              // 3. Mostrar mensaje de éxito rápido
-              ScaffoldMessenger.of(c).showSnackBar(
-                SnackBar(
-                  content: Text(tr('¡Registro exitoso! Por favor inicia sesión.')),
-                  backgroundColor: C.primary,
-                ),
-              );
-
-              // 4. Redirigir a la pantalla de Login
-              Navigator.of(c).pop(); // Regresa a LoginScreen si vino desde ahí
-            }
-          } catch (_) {
-            setState(() => _err = tr('Error al registrar la cuenta'));
+            // 2. POST /auth/registro (propuesta para backend en docs/PENDIENTES_FRONTEND.md). Solo con 2xx se
+            // dice que la cuenta quedó creada. La accesibilidad ya quedó aplicada en prefsProvider.
+            await ref.read(apiProvider).registro(_cuerpoRegistro(ref.read(prefsProvider)));
+            if (!c.mounted) return;
+            ScaffoldMessenger.of(c).showSnackBar(SnackBar(
+                content: Text(tr('¡Registro exitoso! Por favor inicia sesión.')), backgroundColor: C.success));
+            // Regresa al inicio de sesión (abierto encima de él o directo en /registro).
+            if (Navigator.of(c).canPop()) { Navigator.of(c).pop(); } else { c.go('/login'); }
+          } catch (e) {
+            if (!mounted) return;
+            // 404/405: el servidor aún no permite crear cuentas desde la app.
+            final estado = errorApi(e)?.estado;
+            setState(() => _err = estado == 404 || estado == 405 || estado == 501
+                ? tr('Por ahora las cuentas las crea tu equipo de salud. Pídeles tu usuario y contraseña.')
+                : isNetworkError(e) ? tr('Sin conexión. Revisa tu internet e intenta de nuevo.')
+                : estado == 409 ? tr('Ya existe una cuenta con ese correo. Inicia sesión.')
+                : mensajeError(e) ?? tr('Error al registrar la cuenta'));
           } finally {
             if (mounted) setState(() => _busy = false);
           }
@@ -170,6 +172,15 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
       ),
     );
   }
+
+  /// Cuerpo de POST /auth/registro. rol: paciente | cuidador | medico.
+  Map<String, dynamic> _cuerpoRegistro(Prefs p) => {
+    'rol': switch (_role) { Role.paciente => 'paciente', Role.cuidador => 'cuidador', Role.equipo => 'medico' },
+    ..._datos.contacto(), 'contrasena': _p.text,
+    if (_role == Role.paciente) ..._datos.clinicos(),
+    if (_role == Role.cuidador) 'codigo_qr': _vinculo?['codigo'],
+    if (_role == Role.equipo) ...{'cedula': _cedula.text.trim(), 'clinica': _clinica.text.trim()},
+    'preferencias': p.toJson()};
 
   /// Médico: cédula (7 u 8 dígitos) y clínica. Cuidador: QR de un paciente que lo tenga asignado.
   String? _validarRol() {

@@ -32,6 +32,7 @@ dependencies:
   local_auth_android: ^1.0.46 # textos del diálogo de huella en el idioma de la app
   local_auth_darwin: ^1.4.0 # textos de Face ID / Touch ID
   image_picker: ^1.0.7
+  url_launcher: ^6.3.0 # llamar al cuidador (tel:) y abrir Ajustes de la app en iOS
   mobile_scanner: ^5.1.0
   qr_flutter: ^4.1.0
   fl_chart: ^0.68.0
