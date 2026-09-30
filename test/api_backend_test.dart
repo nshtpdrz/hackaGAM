@@ -92,7 +92,7 @@ void main() {
   group('Flujo completo en modo demo (mismas formas que la API)', () {
     test('login -> plan -> registro (y reintento sin duplicar) -> tomas -> receta -> alertas', () async {
       final api = Api();
-      final l = await api.login('maria@demo.invalid', 'Demo2026!');
+      final l = await api.login('maria@demo.invalid', 'demo');
       expect(l['usuario']['rol'], 'paciente');
       await saveToken(l['token']);
       final yo = await api.yo(); expect(yo['paciente_id'], '1');
@@ -116,9 +116,18 @@ void main() {
       expect(despues.firstWhere((t) => t['horario_id'] == tomas.first['horario_id'])['estado'], 'tomada');
 
       final doc = await api.subirDocumento('1', bytes: Uint8List.fromList([1, 2, 3]), nombre: 'receta.jpg');
-      expect(doc['medicamentos'], hasLength(2)); expect((doc['medicamentos'] as List).last['por_revisar'], true);
+      expect(doc['id'], isNotNull); // viene en documento.id
+      final meds = doc['medicamentos'] as List;
+      expect(meds, hasLength(4)); expect(meds.last['por_revisar'], true); expect(meds.last['sustancia_ia'], true);
+      expect(meds[1]['discrepancias'], {'dosis': ['2 ml', '12 ml']}); expect(meds[1]['lectura_dudosa'], true);
+      expect(meds[1]['dosis'], ''); // null en la API: la persona lo completa
+      expect(meds[2]['componentes'], hasLength(2));
+      expect((doc['lectura'] as Map)['ilegibles'], 1); expect(doc['message_key'], 'interfaz.revise_que_su_medicina_este_bien');
+      expect((doc['advertencias'] as List).first['verificada'], false);
       await api.confirmarDocumento('${doc['id']}', doc['medicamentos']);
-      expect((await api.medicamentos('1')).map((m) => m['nombre']), contains('Naproxeno'));
+      expect((await api.medicamentos('1')).map((m) => m['nombre']), contains('Metformina'));
+      await expectLater(api.confirmarDocumento('${doc['id']}', doc['medicamentos']), // segunda vez: 409
+          throwsA(predicate((e) => errorApi(e!)?.estado == 409)));
       expect((await api.adherencia('1'))['porcentaje'], 86);
 
       final alertas = await api.alertas();
@@ -129,7 +138,7 @@ void main() {
 
     test('Equipo: tablero con semáforo y QR', () async {
       final api = Api();
-      await saveToken((await api.login('medica@demo.invalid', 'Demo2026!'))['token']);
+      await saveToken((await api.login('medica@demo.invalid', 'demo'))['token']);
       final yo = await api.yo(); expect(yo['rol'], 'equipo'); expect(yo['cedula_verificada'], true);
       final ps = await api.pacientes();
       expect(ps.first['semaforo'], 'rojo'); // rojos primero
@@ -138,5 +147,29 @@ void main() {
       final p = await api.paciente('3');
       expect(p['nombre'], 'Carmen Demo Sánchez'); expect(p['programas'], containsAll(['cronico', 'adulto_mayor']));
     });
+  
+  group('Heridas y MEDMAP (guía de integración)', () {
+    test('confirmación: vía, días, frecuencia corregida y sustancia de IA sin id', () {
+      final c = confirmacionDocumento([{'nombre': 'Paracetamol gotas', 'sustancia_id': null, 'dosis': '2 ml', 'via': 'oral',
+        'frecuencia': 'cada 6 h', 'frecuencia_horas': 8, 'duracion_dias': 3, 'horarios': ['06:00']}]);
+      final m = (c['medicamentos'] as List).first as Map;
+      expect(m['frecuencia_horas'], 6); expect(m['via'], 'oral'); expect(m['dias'], [1, 2, 3, 4, 5, 6, 7]);
+      expect(m.containsKey('sustancia_id'), false); expect(m['duracion_dias'], 3);
+    });
+
+    test('flujo de herida: registrar, foto con moneda y dos toques, detalle', () async {
+      final api = Api();
+      await saveToken((await api.login('maria@demo.invalid', 'demo'))['token']);
+      final l = await api.crearLesion('1', {'tipo': 'pie_diabetico', 'zona_corporal': 'talon', 'lado': 'izquierdo'});
+      expect(l['tipo'], 'pie_diabetico');
+      final f = await api.subirFotoLesion('${l['id']}', bytes: Uint8List.fromList([1, 2, 3]), referencia: 'moneda_10_pesos',
+          toqueReferencia: [120, 340], toqueLesion: [410, 380]);
+      expect(tamanoLesion(f), '3.8 × 0.5 cm'); expect(f['message_key'], 'lesiones.foto_recibida');
+      final sinRef = await api.subirFotoLesion('${l['id']}', bytes: Uint8List.fromList([1]), referencia: 'ninguna');
+      expect(tamanoLesion(sinRef), isNull); expect(sinRef['message_key'], 'lesiones.use_referencia');
+      final d = await api.lesion('${l['id']}');
+      expect(d['fotos'], hasLength(2)); expect((await api.lesiones('1')).map((x) => x['id']), contains(l['id']));
+    });
   });
+});
 }

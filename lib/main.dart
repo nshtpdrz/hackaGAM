@@ -23,7 +23,7 @@ class MedmapApp extends ConsumerWidget {
     fijarIdioma(p.lang); // textos de pantalla (tr) en el idioma elegido
     ref.watch(catalogLoadProvider);
     return MaterialApp.router(
-      title: 'MEDMAP', routerConfig: ref.watch(routerProvider),
+      title: 'SENDA', routerConfig: ref.watch(routerProvider),
       theme: buildTheme(highContrast: p.highContrast, patient: s?.role == Role.paciente || p.bigButtons),
       locale: Locale(p.lang == 'ote' ? 'es' : p.lang), // ote usa catálogo propio
       localizationsDelegates: const [

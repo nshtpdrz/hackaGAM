@@ -6,6 +6,7 @@ import '../../core/biometria.dart';
 import '../../core/state.dart';
 import '../../core/theme.dart';
 import '../../core/tr.dart';
+import '../../widgets/marca.dart';
 
 // 0. Splash: restaura la sesión (con biometría si está activa) y decide a dónde ir.
 class SplashScreen extends ConsumerStatefulWidget { const SplashScreen({super.key});
@@ -26,8 +27,17 @@ class _SplashState extends ConsumerState<SplashScreen> {
   }
 
   @override
-  Widget build(BuildContext c) => Scaffold(backgroundColor: C.p100, body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-    Text('MEDMAP', style: Theme.of(c).textTheme.headlineLarge?.copyWith(color: C.primary)),
-    const SizedBox(height: 8), Text(ref.watch(trProvider)('app.tagline').text, style: Theme.of(c).textTheme.bodyLarge),
-    const SizedBox(height: 32), Semantics(label: tr('Cargando'), child: const CircularProgressIndicator())])));
+  Widget build(BuildContext c) {
+    final ancho = MediaQuery.sizeOf(c).width;
+    return Scaffold(backgroundColor: C.marca, body: SafeArea(child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        EmblemaSenda(tam: (ancho * .45).clamp(120.0, 220.0)),
+        const SizedBox(height: 28),
+        LogoSenda(alto: (ancho * .11).clamp(36.0, 56.0), blanco: true),
+        const SizedBox(height: 12),
+        Text(ref.watch(trProvider)('app.tagline').text, textAlign: TextAlign.center,
+          style: Theme.of(c).textTheme.bodyLarge?.copyWith(color: Colors.white)),
+        const SizedBox(height: 32),
+        Semantics(label: tr('Cargando'), child: const CircularProgressIndicator(color: Colors.white))])))));
+  }
 }

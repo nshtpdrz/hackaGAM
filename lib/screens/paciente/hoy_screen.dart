@@ -22,7 +22,9 @@ class HoyScreen extends ConsumerWidget { const HoyScreen({super.key});
             title: Text(tr('{hora} · {med}', {'hora': h['hora'], 'med': h['medicamento']})),
             subtitle: Text(tr('{dosis} · {estado}', {'dosis': h['dosis'], 'estado': tr(etiquetasEstado['${h['estado']}'] ?? '${h['estado']}')})),
             onTap: () => c.push('/recordatorio', extra: h)))),
-        BigButton(tr('Mostrar mi código QR'), icon: Icons.qr_code, secondary: true, onTap: () => c.push('/qr'))]),
+        BigButton(tr('Mostrar mi código QR'), icon: Icons.qr_code, secondary: true, onTap: () => c.push('/qr')),
+        const SizedBox(height: 12),
+        BigButton(tr('Seguimiento de heridas'), icon: Icons.healing_outlined, secondary: true, onTap: () => c.push('/heridas'))]),
       onRetry: () => ref.invalidate(futureFor('horarios'))));
   }
 }

@@ -12,7 +12,7 @@ class OCRReviewCard extends StatefulWidget {
 }
 class _OCRState extends State<OCRReviewCard> {
   static const _campos = {'nombre': 'Nombre comercial', 'sustancia': 'Sustancia activa', 'concentracion': 'Concentración',
-    'dosis': 'Dosis', 'frecuencia': 'Frecuencia', 'via': 'Vía'};
+    'dosis': 'Dosis', 'frecuencia': 'Frecuencia', 'via': 'Vía', 'momento': 'Indicaciones (p. ej. con alimentos)'};
   late final Map<String, TextEditingController> _c = {for (final k in _campos.keys) k: TextEditingController(text: '${widget.med[k] ?? ''}')};
   void _emit() => widget.onChanged({...widget.med, for (final e in _c.entries) e.key: e.value.text.trim()});
   @override

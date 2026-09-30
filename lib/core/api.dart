@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -9,6 +10,7 @@ import 'mock_api.dart';
 /// La app NUNCA habla con PostgreSQL, IA ni servicios externos. Todas las respuestas pasan por
 /// api_modelos.dart para convertirlas al formato de las pantallas.
 ///
+///   Servidor de demo:  flutter run --dart-define=API_URL=<URL de la guía de integración>   (no se guarda en el repositorio)
 ///   Teléfono por USB:  flutter run --dart-define=API_URL=http://localhost:3000/api/v1   (y adb reverse tcp:3000 tcp:3000)
 ///   Emulador Android:  --dart-define=API_URL=http://10.0.2.2:3000/api/v1
 ///   Sin API_URL la app arranca en modo demo (mock_api.dart), con las mismas formas de respuesta que la API.
@@ -19,8 +21,10 @@ Future<String?> readToken() => _store.read(key: 'jwt');
 Future<void> saveToken(String? t) => t == null ? _store.delete(key: 'jwt') : _store.write(key: 'jwt', value: t);
 
 class Api {
-  final Dio _d = Dio(BaseOptions(baseUrl: apiUrl, connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 40))); // la lectura de recetas con Azure tarda ~10 s
+  // Guía: 15 s para casi todo; subir recetas y fotos de lesiones usa [_lento] (una receta manuscrita tarda ~25 s).
+  final Dio _d = Dio(BaseOptions(baseUrl: apiUrl, connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15), sendTimeout: const Duration(seconds: 15)));
+  static final _lento = Options(receiveTimeout: const Duration(seconds: 90), sendTimeout: const Duration(seconds: 90));
   void Function()? onUnauthorized;
   Api() {
     if (useMock) _d.interceptors.add(MockInterceptor());
@@ -39,7 +43,7 @@ class Api {
   }
   Future<dynamic> _get(String p, [Map<String, dynamic>? q]) async =>
       (await _d.get(p, queryParameters: q?..removeWhere((_, v) => v == null))).data;
-  Future<dynamic> _post(String p, [dynamic b]) async => (await _d.post(p, data: b)).data;
+  Future<dynamic> _post(String p, [dynamic b, Options? o]) async => (await _d.post(p, data: b, options: o)).data;
   Future<dynamic> _put(String p, dynamic b) async => (await _d.put(p, data: b)).data;
   Future<dynamic> _patch(String p, dynamic b) async => (await _d.patch(p, data: b)).data;
 
@@ -131,10 +135,30 @@ class Api {
       normalizarDocumento(await _post('/pacientes/$id/documentos', FormData.fromMap({'tipo': tipo,
         if (bytes != null) 'archivo': MultipartFile.fromBytes(bytes, filename: nombre ?? 'receta.jpg',
             contentType: DioMediaType('image', (nombre ?? '').toLowerCase().endsWith('.png') ? 'png' : 'jpeg')),
-        if (texto != null && texto.trim().isNotEmpty) 'texto': texto.trim()})));
+        if (texto != null && texto.trim().isNotEmpty) 'texto': texto.trim()}), _lento));
   /// Lo que la persona revisó -> medicamentos y horarios guardados. Luego hay que volver a pedir /horarios.
   Future<dynamic> confirmarDocumento(String docId, List medicamentos) =>
       _post('/documentos/$docId/confirmar', confirmacionDocumento(medicamentos));
+
+  // Seguimiento fotográfico de lesiones (la IA describe y compara; no diagnostica)
+  Future<List<Map<String, dynamic>>> lesiones(String pacienteId) async =>
+      normalizarLesiones(await _get('/pacientes/$pacienteId/lesiones'));
+  /// {tipo, zona_corporal, lado, descripcion?}
+  Future<Map<String, dynamic>> crearLesion(String pacienteId, Map<String, dynamic> b) async =>
+      normalizarLesion(await _post('/pacientes/$pacienteId/lesiones', b));
+  /// Detalle (el equipo ve descripción de la IA, contornos, escala y evolución).
+  Future<Map<String, dynamic>> lesion(String id) async => normalizarLesion(await _get('/lesiones/$id'));
+  /// Foto JPG/PNG ≤ 8 MB + referencia (moneda_10_pesos|tarjeta|ninguna) + toques en píxeles de la foto ORIGINAL.
+  Future<Map<String, dynamic>> subirFotoLesion(String lesionId, {required Uint8List bytes, required String referencia,
+      List<num>? toqueReferencia, List<num>? toqueLesion}) async =>
+      normalizarFotoLesion(await _post('/lesiones/$lesionId/fotos', FormData.fromMap({
+        'archivo': MultipartFile.fromBytes(bytes, filename: 'herida.jpg', contentType: DioMediaType('image', 'jpeg')),
+        'referencia': referencia,
+        if (toqueReferencia != null && toqueLesion != null)
+          'toques': jsonEncode({'referencia': toqueReferencia, 'lesion': toqueLesion}),
+        'tomada_en': ahoraUtc()}), _lento));
+  /// Equipo: confirma la escala (PUSH o REEDA) propuesta para una foto.
+  Future<dynamic> confirmarEscalaLesion(String fotoId, Map<String, dynamic> b) => _patch('/fotos-lesion/$fotoId/escala', b);
 
   // QR y alertas
   Future<Map<String, dynamic>> qr(String id) async => normalizarQr(await _get('/pacientes/$id/qr'));

@@ -1,11 +1,11 @@
 {
-    "name": "medmap",
-    "short_name": "medmap",
+    "name": "SENDA",
+    "short_name": "SENDA",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#593286",
+    "theme_color": "#593286",
+    "description": "SENDA: seguimiento de pacientes entre consultas.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

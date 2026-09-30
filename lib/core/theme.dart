@@ -6,7 +6,8 @@ class C {
       p100 = Color(0xFFE4D3F3), bg = Color(0xFFF8F7FA), surface = Colors.white,
       text = Color(0xFF25202B), text2 = Color(0xFF6B6470), border = Color(0xFFE6E1EA),
       success = Color(0xFF2E8B67), warning = Color(0xFFD99A2B), error = Color(0xFFC94A4A),
-      info = Color(0xFF3B82A0);
+      info = Color(0xFF3B82A0),
+      marca = Color(0xFF593286); // morado del icono SENDA (arranque y encabezados)
 }
 
 /// Alturas mínimas: 48dp general, 64dp modo paciente.

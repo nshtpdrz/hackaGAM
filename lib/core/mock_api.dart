@@ -8,9 +8,12 @@ import 'mediciones.dart';
 const useMock = bool.fromEnvironment('MOCK',
     defaultValue: !(bool.hasEnvironment('API_URL') || bool.hasEnvironment('API_BASE')));
 
-/// Usuarios de demo (mismos correos que la semilla del backend; contraseña Demo2026!).
-const cuentasDemo = {'paciente': 'maria@demo.invalid', 'cuidador': 'pedro@demo.invalid', 'equipo': 'medica@demo.invalid'};
-const contrasenaDemo = 'Demo2026!';
+/// Usuarios de demo (mismos correos que la semilla del backend).
+// rosa@ es hija de Carmen y sobrina de Juan: recibe sus alertas ámbar (guía de integración).
+const cuentasDemo = {'paciente': 'maria@demo.invalid', 'cuidador': 'rosa@demo.invalid', 'equipo': 'medica@demo.invalid'};
+/// La contraseña de las cuentas de demo del servidor NO se guarda en el repositorio (la guía pide no compartirla).
+/// Con el servidor real: --dart-define=DEMO_PASSWORD=<contraseña de la guía>. El modo demo acepta cualquiera.
+const contrasenaDemo = String.fromEnvironment('DEMO_PASSWORD', defaultValue: 'demo');
 
 class _ErrorMock implements Exception { final int estado; final String codigo; final Map? campos;
   _ErrorMock(this.estado, this.codigo, [this.campos]); }
@@ -19,6 +22,7 @@ class MockInterceptor extends Interceptor {
   static bool offline = false; // demo: simula falta de conexión
   static String _rolApi = 'paciente';
   static String _nombreUsuario = 'María Demo López';
+  static String _correo = 'maria@demo.invalid';
 
   static final _pacientes = <String, Map<String, dynamic>>{
     '1': {'id': '1', 'perfil': {'nombre': 'María Demo López', 'fecha_nacimiento': '1996-03-12', 'sexo': 'F', 'tipo_sangre': 'O+',
@@ -58,6 +62,11 @@ class MockInterceptor extends Interceptor {
     return out;
   }();
   static final _lotes = <String, Map<String, dynamic>>{}; // id_local -> resultado (reintentos sin duplicar)
+  static final _confirmados = <String>{}; // documentos ya confirmados (409 si se repite)
+  static final _lesiones = <Map<String, dynamic>>[
+    {'id': 'l1', 'paciente_id': '1', 'tipo': 'herida_quirurgica', 'zona_corporal': 'abdomen', 'lado': 'centro', 'descripcion': 'Cesárea previa',
+      'fotos': [{'id': 'f1', 'tomada_en': DateTime.now().subtract(const Duration(days: 3)).toUtc().toIso8601String(), 'largo_cm': 4.2, 'ancho_cm': 0.6,
+        'estado': 'para_revision', 'descripcion_ia': 'Bordes afrontados, sin secreción visible (demo).', 'escala': {'nombre': 'REEDA', 'puntaje': 2, 'confirmada': false}}]}];
 
   static final List<Map<String, dynamic>> _horarios = [
     {'id': 'h1', 'hora_local': '08:00', 'medicamento': {'id': 'm1', 'nombre_comercial': 'Losartán', 'concentracion': '50 mg', 'dosis': '1 tableta', 'via': 'oral'}},
@@ -109,9 +118,10 @@ class MockInterceptor extends Interceptor {
     if (r('/auth/login')) {
       final b = body as Map; final c = '${b['correo'] ?? ''}'.toLowerCase();
       if (c.isEmpty || '${b['contrasena'] ?? ''}'.isEmpty) throw _ErrorMock(401, 'credenciales_invalidas');
+      _correo = c;
       _rolApi = c.contains('medic') ? 'medico' : c.contains('enfermera') ? 'enfermera'
           : (c.contains('pedro') || c.contains('rosa') || c.contains('cuidador')) ? 'cuidador' : 'paciente';
-      _nombreUsuario = switch (_rolApi) { 'medico' => 'Dra. Ana Demo Pérez', 'enfermera' => 'Enfermera Demo', 'cuidador' => 'Pedro Demo',
+      _nombreUsuario = switch (_rolApi) { 'medico' => 'Dra. Ana Demo Pérez', 'enfermera' => 'Enfermera Demo', 'cuidador' => c.contains('rosa') ? 'Rosa Demo' : 'Pedro Demo',
         _ => c.contains('carmen') ? 'Carmen Demo Sánchez' : c.contains('juan') ? 'Juan Demo Ruiz' : 'María Demo López' };
       return {'token': 'mock-token', 'expira_en_horas': 8, 'usuario': {'id': 'u-$_rolApi', 'nombre': _nombreUsuario, 'rol': _rolApi}};
     }
@@ -123,10 +133,12 @@ class MockInterceptor extends Interceptor {
       }
       final aCargo = switch (_rolApi) {
         'paciente' => [{'id': '1', 'nombre': _nombreUsuario}],
-        'cuidador' => [{'id': '1', 'nombre': 'María Demo López', 'parentesco': 'esposa'}, {'id': '3', 'nombre': 'Carmen Demo Sánchez', 'parentesco': 'suegra'}],
+        // Semilla: Pedro es esposo de María; Rosa es hija de Carmen y sobrina de Juan.
+        'cuidador' => _correo.contains('pedro') ? [{'id': '1', 'nombre': 'María Demo López', 'parentesco': 'esposa'}]
+            : [{'id': '3', 'nombre': 'Carmen Demo Sánchez', 'parentesco': 'madre'}, {'id': '2', 'nombre': 'Juan Demo Ruiz', 'parentesco': 'tío'}],
         _ => <Map<String, dynamic>>[] };
       final usuario = _rolApi == 'medico' ? _medico
-          : {'id': 'u-$_rolApi', 'nombre': _nombreUsuario, 'rol': _rolApi, 'correo': '${_rolApi == 'cuidador' ? 'pedro' : 'maria'}@demo.invalid',
+          : {'id': 'u-$_rolApi', 'nombre': _nombreUsuario, 'rol': _rolApi, 'correo': _correo,
              if (_rolApi == 'paciente') ...{'telefono': _pacientes['1']!['perfil']['telefono']}};
       return {'usuario': usuario, 'pacientes_a_cargo': aCargo, if (_prefs.isNotEmpty) 'preferencias': _prefs};
     }
@@ -224,22 +236,62 @@ class MockInterceptor extends Interceptor {
       final texto = f?.fields.firstWhere((e) => e.key == 'texto', orElse: () => const MapEntry('', '')).value ?? '';
       if ((f?.files.isEmpty ?? true) && texto.isEmpty) throw _ErrorMock(400, 'entrada_invalida', {'archivo': 'requerido'});
       if (texto.toLowerCase().contains('ilegible')) throw _ErrorMock(422, 'documento_ilegible');
-      return {'id': 'd99', 'medicamentos': [
-        {'nombre_comercial': 'Naproxeno', 'sustancia': {'id': 's-naproxeno', 'nombre': 'naproxeno'}, 'concentracion': '250 mg', 'dosis': '1 tableta',
-          'frecuencia_horas': 8, 'duracion_dias': 5, 'via': 'oral', 'horarios_propuestos': ['06:00', '14:00', '22:00'], 'por_revisar': false},
-        {'nombre_comercial': 'Xyzamol', 'sustancia': {'id': null, 'nombre': null}, 'concentracion': '', 'dosis': '',
-          'horarios_propuestos': [], 'por_revisar': true, 'motivo_revision': 'no_en_catalogo'}],
-        'alertas_medicacion': [{'nivel': 'ambar', 'mensaje_clave': 'adv.revisar', 'fuente': 'Catálogo demo', 'cita': 'Dato ficticio'}],
-        'alergias_en_documento': [], 'texto_ocr': texto.isNotEmpty ? texto : 'NAPROXENO 250 MG 1 TAB C/8H X 5 DIAS'};
+      final id = 'd${_confirmados.length + 99}';
+      // Forma de la guía de integración: documento.id, medicamentos con lectura dudosa, discrepancias y combinados.
+      return {'documento': {'id': id, 'archivo_url': '/documentos/$id/archivo'}, 'mensaje_clave': 'interfaz.revise_que_su_medicina_este_bien',
+        'lectura': {'manuscrito': true, 'renglones_dudosos': 1, 'doble_lectura': true, 'ilegibles': 1},
+        'medicamentos': [
+          {'nombre_comercial': 'Metformina', 'sustancia': {'id': 's-metformina', 'nombre_generico': 'metformina', 'clase': 'biguanida', 'origen': 'catalogo'},
+            'concentracion': '850 mg', 'dosis': '1 tableta', 'via': 'oral', 'frecuencia_horas': 12, 'momento': 'con alimentos', 'duracion_dias': null,
+            'horarios_propuestos': ['08:00', '20:00'], 'por_revisar': false},
+          {'nombre_comercial': 'Paracetamol gotas', 'sustancia': {'id': 's-paracetamol', 'nombre_generico': 'paracetamol', 'clase': 'analgésico', 'origen': 'catalogo'},
+            'concentracion': '100 mg/ml', 'dosis': null, 'via': 'oral', 'frecuencia_horas': 8, 'duracion_dias': 3,
+            'horarios_propuestos': ['06:00', '14:00', '22:00'], 'por_revisar': true, 'motivo_revision': 'lectura_dudosa', 'lectura_dudosa': true,
+            'discrepancias': {'dosis': {'ocr': '2 ml', 'vision': '12 ml'}}},
+          {'nombre_comercial': 'Losartán/hidroclorotiazida', 'producto_combinado': {'id': 'pc-1', 'componentes': [
+              {'sustancia': {'id': 's-losartan', 'nombre_generico': 'losartán'}, 'concentracion': '50 mg'},
+              {'sustancia': {'id': 's-hctz', 'nombre_generico': 'hidroclorotiazida'}, 'concentracion': '12.5 mg'}]},
+            'concentracion': '50/12.5 mg', 'dosis': '1 tableta', 'via': 'oral', 'frecuencia_horas': 24, 'horarios_propuestos': ['08:00'], 'por_revisar': false},
+          {'nombre_comercial': 'Xyzamol', 'sustancia': {'id': null, 'nombre_generico': 'xyzamol', 'origen': 'ia'}, 'concentracion': null, 'dosis': null,
+            'horarios_propuestos': [], 'por_revisar': true, 'motivo_revision': 'clasificada_por_ia_fuera_de_catalogo'}],
+        'alertas_medicacion': [
+          {'regla': 'duplicidad_terapeutica', 'nivel': 'ambar', 'mensaje_clave': 'adv.revisar', 'fuente': 'Catálogo demo', 'verificada': false}],
+        'alergias_en_documento': ['Penicilina'], 'texto_ocr': texto.isNotEmpty ? texto : 'METFORMINA 850 MG 1 TAB C/12H CON ALIMENTOS ...'};
     }
     if (r('/documentos/[^/]+/confirmar')) {
+      final id = p.split('/')[2];
+      if (!_confirmados.add(id)) throw _ErrorMock(409, 'ya_confirmado');
       final meds = ((body as Map)['medicamentos'] as List).cast<Map>();
       for (final x in meds) {
         _medicamentos.add({'id': 'm${_medicamentos.length + 1}', 'nombre_comercial': x['nombre_comercial'], 'concentracion': x['concentracion'] ?? '',
           'dosis': x['dosis'] ?? '', 'frecuencia_horas': x['frecuencia_horas'], 'horarios': [for (final hh in (x['horarios'] as List? ?? [])) {'hora_local': hh}], 'activo': true});
       }
-      return {'medicamentos': meds, 'alertas': []};
+      return {'medicamentos': meds, 'alertas_medicacion': [], 'alertas': []};
     }
+    if (r('/pacientes/[^/]+/lesiones')) {
+      if (m == 'POST') {
+        final l = {'id': 'l${_lesiones.length + 1}', 'paciente_id': idP, ...(body as Map).cast<String, dynamic>(), 'fotos': <Map<String, dynamic>>[]};
+        _lesiones.add(l); return {'lesion': l};
+      }
+      return {'lesiones': _lesiones.where((l) => l['paciente_id'] == idP).toList()};
+    }
+    if (r('/lesiones/[^/]+/fotos')) {
+      final l = _lesiones.firstWhere((x) => x['id'] == p.split('/')[2], orElse: () => throw _ErrorMock(404, 'no_encontrado'));
+      final f = body as FormData; String campo(String k) => f.fields.firstWhere((e) => e.key == k, orElse: () => const MapEntry('', '')).value;
+      final conToques = campo('toques').isNotEmpty && campo('referencia') != 'ninguna';
+      final previa = (l['fotos'] as List).isEmpty ? null : (l['fotos'] as List).last as Map;
+      final foto = {'id': 'f${DateTime.now().millisecondsSinceEpoch}', 'tomada_en': campo('tomada_en'), 'estado': 'para_revision',
+        if (conToques) ...{'largo_cm': 3.8, 'ancho_cm': 0.5}, 'descripcion_ia': 'Bordes afrontados; comparar con la foto anterior (demo).',
+        'escala': {'nombre': 'REEDA', 'puntaje': 1, 'confirmada': false}};
+      (l['fotos'] as List).add(foto);
+      return {'foto': foto, 'mensaje_clave': conToques ? 'lesiones.foto_recibida' : 'lesiones.use_referencia',
+        'comparacion': previa == null ? null : {'cambio_largo_cm': conToques ? -0.4 : null, 'resumen': 'Más pequeña que la foto anterior (demo).'}};
+    }
+    if (r('/lesiones/[^/]+')) {
+      final l = _lesiones.firstWhere((x) => x['id'] == p.split('/')[2], orElse: () => throw _ErrorMock(404, 'no_encontrado'));
+      return {'lesion': l, 'fotos': l['fotos'], 'evolucion': {'resumen': 'Tendencia a disminuir de tamaño (demo).'}};
+    }
+    if (r('/fotos-lesion/[^/]+/escala')) return {'ok': true};
     if (r('/pacientes/[^/]+/qr')) return {'codigo_qr': _pacientes[idP]?['codigo_qr'] ?? 'PQR-DEMO-$idP'};
     if (r('/pacientes/[^/]+/preferencias')) { _prefs = {..._prefs, ...(body as Map).cast<String, dynamic>()}; return _prefs; }
     if (r('/pacientes/[^/]+/consentimientos')) return {'ok': true};

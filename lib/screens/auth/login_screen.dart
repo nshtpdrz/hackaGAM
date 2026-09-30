@@ -11,6 +11,8 @@ import 'register_screen.dart';
 import '../../core/tr.dart';
 import '../../core/api_modelos.dart';
 import '../../core/sync.dart';
+import '../../widgets/sync_status.dart';
+import '../../widgets/marca.dart';
 
 // 1. Login (biometría: local_auth desbloqueará el token guardado; pendiente)
 class LoginScreen extends ConsumerStatefulWidget { const LoginScreen({super.key});
@@ -26,8 +28,10 @@ class _LoginState extends ConsumerState<LoginScreen> {
           DropdownMenuItem(value: e.key, child: Text(e.value))],
         onChanged: (v) => ref.read(prefsProvider.notifier).state = p.copy(lang: v))),
       const SizedBox(height: 16),
-      Text('MEDMAP', style: Theme.of(c).textTheme.headlineLarge?.copyWith(color: C.primary)),
-      const MsgText('app.tagline'), const SizedBox(height: 32),
+      Row(children: [const IconoSenda(tam: 64, decorativo: true), const SizedBox(width: 16),
+        const Expanded(child: Align(alignment: Alignment.centerLeft, child: LogoSenda(alto: 44)))]),
+      const SizedBox(height: 12),
+      const MsgText('app.tagline'), const EstadoServidor(), const SizedBox(height: 32),
       TextField(controller: _e, keyboardType: TextInputType.emailAddress, decoration: InputDecoration(labelText: t('login.email').text)),
       const SizedBox(height: 16),
       TextField(controller: _p, obscureText: true, decoration: InputDecoration(labelText: t('login.pass').text)),
