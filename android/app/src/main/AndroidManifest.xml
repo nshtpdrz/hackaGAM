@@ -1,8 +1,45 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Permisos de SENDA. Cada uno dice qué lo usa; ver docs/EMPAQUETADO.md (tabla de permisos). -->
+    <!-- Red: API /api/v1 (dio), estado de conexión para la cola sin internet (connectivity_plus) y push (FCM). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Cámara: escanear QR (mobile_scanner) y fotografiar recetas, heridas y foto de perfil (image_picker).
+         La galería usa el selector de fotos del sistema, que no pide permiso de almacenamiento. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Biometría (local_auth). USE_FINGERPRINT es el equivalente de Android 7 y 8. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
+    <!-- Notificaciones: Android 13+ las pide al usuario (alarmas de tomas y push). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Alarma de tomas (lib/core/reminders.dart): a la hora exacta, sonando y vibrando, también tras reiniciar.
+         En Android 14+ la alarma exacta viene apagada: la app lleva a Ajustes desde Preferencias > Avisos.
+         Sin ella las alarmas se programan inexactas (pueden retrasarse unos minutos). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- Alarma a pantalla completa sobre el bloqueo. En Android 14+ Google Play solo la concede sola a apps de
+         alarma o llamadas; si no, la persona la activa en Ajustes (Preferencias > Avisos) y mientras tanto
+         la alarma llega como notificación normal que suena y vibra. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+
+    <!-- Que la cámara no sea obligatoria: así la app se puede instalar en tabletas o teléfonos sin cámara. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+
+    <!-- usesCleartextTraffic: la API de la demo va por http y Android 9+ lo bloquea. QUITAR cuando el backend
+         tenga HTTPS (docs/EMPAQUETADO.md).
+         Sin respaldo ni traspaso a otro teléfono: son datos de salud y las llaves del almacenamiento seguro no
+         sobreviven a una restauración (la sesión se vuelve a iniciar con contraseña). -->
     <application
-        android:label="medmap"
+        android:label="SENDA"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon"
+        android:usesCleartextTraffic="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/reglas_respaldo">
+        <!-- showWhenLocked/turnScreenOn no van aquí: MainActivity los activa solo cuando la abre una alarma de toma. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,21 +62,60 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- flutter_local_notifications: alarmas programadas, reprogramarlas al reiniciar o actualizar la app,
+             y los botones "Ya la tomé" / "Más tarde". -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"/>
+
+        <!-- Push (Firebase Cloud Messaging). Ver docs/NOTIFICACIONES.md.
+             - Canal por omisión "alertas" (lo crea lib/core/push.dart al arrancar).
+             - Ícono pequeño blanco (Android pinta un cuadro gris si se usa el ícono a color).
+             - Sin token automático: se pide después de iniciar sesión, no antes. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="alertas"/>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_senda"/>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/senda_morado"/>
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false"/>
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false"/>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
-    <!-- Required to query activities that can process text, see:
-         https://developer.android.com/training/package-visibility and
-         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
-
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <!-- Visibilidad de paquetes (Android 11+): sin esto la app no "ve" a otras apps que necesita. -->
     <queries>
+        <!-- Motor de Flutter (seleccionar texto). -->
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Lectura en voz alta (flutter_tts): encontrar el motor de voz del teléfono. -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
+        </intent>
+        <!-- Tomar foto con la app de cámara (image_picker). -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE"/>
         </intent>
     </queries>
 </manifest>

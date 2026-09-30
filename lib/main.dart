@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/alarma_tomas.dart';
+import 'core/push.dart';
 import 'core/reminders.dart';
 import 'core/router.dart';
 import 'core/state.dart';
@@ -12,6 +13,7 @@ import 'core/escala_texto.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initReminders();
+  await iniciarPush(); // sin configuración de Firebase no hace nada (docs/NOTIFICACIONES.md)
   runApp(const ProviderScope(child: MedmapApp()));
 }
 
@@ -22,8 +24,14 @@ class MedmapApp extends ConsumerWidget {
     final p = ref.watch(prefsProvider); final s = ref.watch(sessionProvider);
     fijarIdioma(p.lang); // textos de pantalla (tr) en el idioma elegido
     ref.watch(catalogLoadProvider);
+    final router = ref.watch(routerProvider);
+    // Ya se puede navegar desde una alarma o un push (no estamos en splash ni login).
+    bool listo() {
+      final ruta = router.routerDelegate.currentConfiguration.uri.path;
+      return ruta.isNotEmpty && !const {'/splash', '/login', '/registro', '/consentimiento'}.contains(ruta);
+    }
     return MaterialApp.router(
-      title: 'SENDA', routerConfig: ref.watch(routerProvider),
+      title: 'SENDA', routerConfig: router,
       theme: buildTheme(highContrast: p.highContrast, patient: s?.role == Role.paciente || p.bigButtons),
       locale: Locale(p.lang == 'ote' ? 'es' : p.lang), // ote usa catálogo propio
       localizationsDelegates: const [
@@ -36,11 +44,12 @@ class MedmapApp extends ConsumerWidget {
         data: MediaQuery.of(ctx).copyWith(textScaler: EscalaTexto(p.textScale)), // no lineal: títulos crecen menos
         // Alarma de tomas: abre /recordatorio cuando toca una toma o se toca una notificación.
         child: VigilanteTomas(
-          abrir: (toma) => ref.read(routerProvider).push('/recordatorio', extra: toma),
-          listo: () {
-            final ruta = ref.read(routerProvider).routerDelegate.currentConfiguration.uri.path;
-            return ruta.isNotEmpty && !const {'/splash', '/login', '/registro', '/consentimiento'}.contains(ruta);
-          },
-          child: child!)));
+          abrir: (toma) => router.push('/recordatorio', extra: toma),
+          listo: listo,
+          // Push: registra el teléfono con sesión, lo olvida al cerrarla y abre la pantalla del aviso tocado.
+          child: ReceptorPush(
+            abrir: (ruta, {extra, pestana = false}) => pestana ? router.go(ruta) : router.push(ruta, extra: extra),
+            listo: listo,
+            child: child!))));
   }
 }

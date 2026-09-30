@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Morado de la marca SENDA: color del ícono en las notificaciones push. -->
+    <color name="senda_morado">#593286</color>
+</resources>

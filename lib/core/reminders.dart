@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart' show TimeOfDay;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -8,6 +9,14 @@ import 'package:timezone/timezone.dart' as tz;
 import 'tr.dart';
 
 final _plugin = FlutterLocalNotificationsPlugin();
+bool _iniciado = false; // por isolate: el de segundo plano (push de solo datos) lo inicia aparte
+
+/// Ícono pequeño blanco (android/app/src/main/res/drawable-*/ic_stat_senda.png) y morado de la marca.
+const _icono = '@drawable/ic_stat_senda', _morado = Color(0xFF593286);
+
+/// Canal de Android para las notificaciones push (alertas del equipo y de familiares). Es también el canal
+/// por omisión de Firebase (AndroidManifest.xml), así que debe existir antes de que llegue el primer push.
+const canalAlertas = 'alertas';
 
 TimeOfDay parseHora(String s) => TimeOfDay(hour: int.parse(s.split(':')[0]), minute: int.parse(s.split(':')[1]));
 
@@ -22,13 +31,28 @@ void Function(Map<String, dynamic> toma, String? accion)? alResponderAlarma;
 /// Toma que abrió la app desde una notificación (app cerrada). Se consume una sola vez.
 Map<String, dynamic>? tomaDeArranque; String? accionDeArranque;
 
+// Las notificaciones push que se muestran con la app abierta llevan sus datos bajo esta clave,
+// para no confundirlas con una toma al tocarlas.
+const _clavePush = '_push';
+
+/// Qué hacer al tocar un push que se mostró con la app abierta. Lo asigna push.dart.
+void Function(Map<String, dynamic> datos)? alTocarPush;
+
+/// Datos del push local que abrió la app (app cerrada). Se consume una sola vez.
+Map<String, dynamic>? pushLocalDeArranque;
+
 Map<String, dynamic>? _toma(String? payload) {
   try { return payload == null || payload.isEmpty ? null : Map<String, dynamic>.from(jsonDecode(payload) as Map); }
   catch (_) { return null; }
 }
 
+Map<String, dynamic>? _datosPush(Map<String, dynamic>? m) =>
+    m != null && m[_clavePush] is Map ? Map<String, dynamic>.from(m[_clavePush] as Map) : null;
+
 void _alResponder(NotificationResponse r) {
   final t = _toma(r.payload); if (t == null) return;
+  final push = _datosPush(t);
+  if (push != null) { alTocarPush?.call(push); return; }
   if (r.actionId == accionMasTarde) programarPospuesta(t, const Duration(minutes: 10));
   alResponderAlarma?.call(t, r.actionId);
 }
@@ -38,7 +62,7 @@ void _alResponder(NotificationResponse r) {
 @pragma('vm:entry-point')
 void alarmaEnSegundoPlano(NotificationResponse r) {
   if (r.actionId != accionMasTarde) return;
-  final t = _toma(r.payload); if (t == null) return;
+  final t = _toma(r.payload); if (t == null || _datosPush(t) != null) return;
   try { tzdata.initializeTimeZones(); } catch (_) {}
   programarPospuesta(t, const Duration(minutes: 10));
 }
@@ -48,21 +72,95 @@ Future<void> initReminders() async {
   try {
     tzdata.initializeTimeZones();
     await _plugin.initialize(InitializationSettings(
-        android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(notificationCategories: [
+        android: const AndroidInitializationSettings(_icono),
+        // El permiso se pide después de iniciar sesión (pedirPermisoNotificaciones), no al abrir la app.
+        iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false,
+          requestSoundPermission: false, notificationCategories: [
           DarwinNotificationCategory(_categoriaIos, actions: [
             DarwinNotificationAction.plain(accionTomada, tr('Ya la tomé'), options: {DarwinNotificationActionOption.foreground}),
             DarwinNotificationAction.plain(accionMasTarde, tr('Más tarde'))])])),
       onDidReceiveNotificationResponse: _alResponder,
       onDidReceiveBackgroundNotificationResponse: alarmaEnSegundoPlano);
-    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    await android?.requestNotificationsPermission();
-    // Alarmas exactas: ver docs/android_manifest_snippet.xml (sin permiso se programan inexactas).
+    _iniciado = true;
+    await _crearCanalAlertas();
+    // Alarmas exactas y pantalla completa: Preferencias > Avisos (widgets/avisos_settings.dart).
     final arranque = await _plugin.getNotificationAppLaunchDetails();
     if (arranque?.didNotificationLaunchApp == true) {
-      final r = arranque!.notificationResponse;
-      tomaDeArranque = _toma(r?.payload); accionDeArranque = r?.actionId;
+      final r = arranque!.notificationResponse; final t = _toma(r?.payload);
+      pushLocalDeArranque = _datosPush(t);
+      if (pushLocalDeArranque == null) { tomaDeArranque = t; accionDeArranque = r?.actionId; }
     }
+  } catch (_) {}
+}
+
+Future<void> _crearCanalAlertas() async {
+  await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(
+    AndroidNotificationChannel(canalAlertas, tr('Alertas de salud'),
+      description: tr('Avisos del equipo de salud y de tus familiares.'), importance: Importance.high));
+}
+
+/// Pide permiso para mostrar notificaciones (Android 13+ e iOS). Se llama al iniciar sesión.
+Future<bool> pedirPermisoNotificaciones() async {
+  if (kIsWeb) return false;
+  try {
+    final a = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (a != null) return await a.requestNotificationsPermission() ?? false;
+    final i = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+    if (i != null) return await i.requestPermissions(alert: true, badge: true, sound: true) ?? false;
+  } catch (_) {}
+  return false;
+}
+
+/// Permisos de los avisos en este teléfono (null: no aplica o no se pudo saber).
+typedef EstadoAvisos = ({bool? notificaciones, bool? exactas});
+Future<EstadoAvisos> estadoAvisos() async {
+  if (kIsWeb) return (notificaciones: null, exactas: null);
+  try {
+    final a = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (a != null) return (notificaciones: await a.areNotificationsEnabled(), exactas: await a.canScheduleExactNotifications());
+    final i = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+    if (i != null) return (notificaciones: (await i.checkPermissions())?.isEnabled, exactas: null);
+  } catch (_) {}
+  return (notificaciones: null, exactas: null);
+}
+
+/// Android 12+: abre Ajustes > Alarmas y recordatorios. Al volver, las alarmas se reprograman exactas.
+Future<bool> pedirAlarmasExactas() async {
+  if (kIsWeb) return false;
+  try {
+    final ok = await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestExactAlarmsPermission() ?? false;
+    _firma = ''; // la siguiente revisión del vigilante de tomas vuelve a programar todo
+    return ok;
+  } catch (_) { return false; }
+}
+
+/// Android 14+: abre el ajuste de "pantalla completa" si falta (en versiones anteriores ya está permitido).
+Future<bool> pedirPantallaCompleta() async {
+  if (kIsWeb) return false;
+  try {
+    return await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestFullScreenIntentPermission() ?? false;
+  } catch (_) { return false; }
+}
+
+/// Muestra un push como notificación local: con la app abierta (Android no lo muestra solo) o cuando
+/// llega un mensaje de solo datos. Al tocarlo se llama a [alTocarPush] con [datos].
+Future<void> mostrarPush(int id, String titulo, String cuerpo, Map<String, dynamic> datos) async {
+  if (kIsWeb) return;
+  try {
+    if (!_iniciado) { // isolate de segundo plano de Firebase: sin callbacks, solo mostrar
+      await _plugin.initialize(const InitializationSettings(android: AndroidInitializationSettings(_icono),
+        iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false)));
+      _iniciado = true;
+      await _crearCanalAlertas();
+    }
+    await _plugin.show(id, titulo, cuerpo, NotificationDetails(
+        android: AndroidNotificationDetails(canalAlertas, tr('Alertas de salud'),
+          importance: Importance.high, priority: Priority.high, icon: _icono, color: _morado,
+          styleInformation: BigTextStyleInformation(cuerpo)),
+        iOS: const DarwinNotificationDetails(presentAlert: true, presentBanner: true, presentSound: true)),
+      payload: jsonEncode({_clavePush: datos}));
   } catch (_) {}
 }
 
@@ -71,7 +169,8 @@ int _id(String key, int i) => (key.hashCode.abs() % 100000) * 10 + i;
 Future<void> _programar(int id, String titulo, String cuerpo, DateTime cuando, AndroidScheduleMode modo) =>
   _plugin.zonedSchedule(id, titulo, cuerpo, tz.TZDateTime.from(cuando, tz.UTC),
     NotificationDetails(
-      android: AndroidNotificationDetails('tomas', tr('Recordatorios de toma'), importance: Importance.high, priority: Priority.high),
+      android: AndroidNotificationDetails('tomas', tr('Recordatorios de toma'), importance: Importance.high, priority: Priority.high,
+        icon: _icono, color: _morado),
       iOS: const DarwinNotificationDetails()),
     androidScheduleMode: modo,
     uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
@@ -106,6 +205,7 @@ NotificationDetails _detallesAlarma() => NotificationDetails(
     importance: Importance.max, priority: Priority.max, playSound: true,
     enableVibration: true, vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000, 500, 1000]),
     category: AndroidNotificationCategory.alarm, fullScreenIntent: true, visibility: NotificationVisibility.public,
+    icon: _icono, color: _morado,
     audioAttributesUsage: AudioAttributesUsage.alarm,
     additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT: repite sonido y vibración hasta que se atiende
     timeoutAfter: 30 * 60 * 1000, // a los 30 min sin respuesta la toma se considera omitida

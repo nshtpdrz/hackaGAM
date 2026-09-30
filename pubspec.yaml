@@ -1,6 +1,9 @@
 name: medmap
 description: SENDA - seguimiento de pacientes entre consultas (HackaTec 2026)
 publish_to: none
+# Versión de la app: nombre+número (versionName/versionCode en Android, CFBundleShortVersionString/CFBundleVersion en iOS).
+# Subir el número (+N) en cada APK/AAB que se reparta; ver docs/EMPAQUETADO.md.
+version: 1.0.0+1
 environment: {sdk: ">=3.3.0 <4.0.0"}
 dependencies:
   flutter: {sdk: flutter}
@@ -26,6 +29,8 @@ dependencies:
   audioplayers: ^6.0.0
   # Funciones
   local_auth: ^2.2.0
+  local_auth_android: ^1.0.46 # textos del diálogo de huella en el idioma de la app
+  local_auth_darwin: ^1.4.0 # textos de Face ID / Touch ID
   image_picker: ^1.0.7
   mobile_scanner: ^5.1.0
   qr_flutter: ^4.1.0
@@ -36,8 +41,7 @@ dev_dependencies:
   drift_dev: ^2.18.0
   build_runner: ^2.4.9
   flutter_lints: ^4.0.0
-  # Marca SENDA en Android/iOS (cuando existan esas carpetas):
-  #   flutter create --platforms=android,ios .
+  # Marca SENDA en Android/iOS (ya generadas; repetir solo si cambian los PNG de assets/marca):
   #   dart run flutter_launcher_icons && dart run flutter_native_splash:create
   flutter_launcher_icons: ^0.14.4
   flutter_native_splash: ^2.4.6
