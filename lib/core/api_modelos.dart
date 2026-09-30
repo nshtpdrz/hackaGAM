@@ -54,7 +54,9 @@ ErrorApi? errorApi(Object e) {
 String? mensajeError(Object e) {
   final x = errorApi(e); if (x == null) return null;
   return switch (x.codigo) {
-    'credenciales_invalidas' || 'credenciales' => tr('Correo o contraseña incorrectos'),
+    'credenciales_invalidas' || 'credenciales_incorrectas' || 'credenciales' => tr('Correo o contraseña incorrectos'),
+    'sin_sesion' || 'sesion_invalida' => tr('Tu sesión expiró. Inicia sesión de nuevo.'),
+    'usuario_inactivo' => tr('Tu cuenta está desactivada. Pide ayuda a tu clínica.'),
     'sin_permiso' => tr('Tu cuenta no puede ver esta información.'),
     'documento_ilegible' => tr('No se pudo leer la receta. Prueba con otra foto.'),
     'sin_medicamentos' => tr('No detectamos medicamentos'),
@@ -107,7 +109,7 @@ double escalaLetra(Object? letra, [double actual = 1.0]) => switch (letra) {
 const unidades = {'presion': 'mmHg', 'glucosa': 'mg/dL', 'peso': 'kg', 'temperatura': '°C', 'frecuencia_cardiaca': 'lpm'};
 const nombresSintoma = {'cefalea': 'dolor de cabeza', 'acufenos': 'zumbido de oídos', 'alteracion_visual': 'visión borrosa o luces',
   'edema': 'hinchazón', 'sangrado': 'sangrado', 'fiebre': 'fiebre', 'salida_liquido': 'salida de líquido', 'contracciones': 'contracciones',
-  'convulsiones': 'convulsiones', 'disuria': 'ardor al orinar', 'movimientos_fetales_disminuidos': 'menos movimientos del bebé',
+  'convulsiones': 'convulsiones', 'disuria': 'ardor al orinar', 'movimientos_fetales_disminuidos': 'menos movimientos del bebé', 'movimientos_fetales': 'menos movimientos del bebé',
   'nausea': 'náusea', 'vomito': 'vómito', 'diarrea': 'diarrea', 'mucositis': 'llagas en la boca', 'dolor': 'dolor', 'fatiga': 'cansancio',
   'neuropatia': 'hormigueo o adormecimiento', 'falta_de_aire': 'falta de aire', 'dolor_de_pecho': 'dolor de pecho', 'mareo': 'mareo',
   'hipoglucemia_sintomas': 'temblor, sudor o debilidad (azúcar baja)'};
@@ -359,7 +361,8 @@ int? _edad(Object? nac) { final d = DateTime.tryParse('${nac ?? ''}'); if (d == 
 String programaApp(Object? p) => switch ('${p is Map ? (p['programa'] ?? p['clave'] ?? p['nombre']) : p}') {
   'cronicas' || 'cronico' || 'cronicas_degenerativas' => 'cronico', 'adulto_mayor' => 'adulto_mayor',
   'embarazo' || 'embarazo_puerperio' => 'embarazo', final otro => otro };
-String programaApi(String p) => p == 'cronico' ? 'cronicas' : p;
+/// Confirmado con GET /salud: los programas del servidor son cronicas, embarazo_puerperio y adulto_mayor.
+String programaApi(String p) => switch (p) { 'cronico' => 'cronicas', 'embarazo' => 'embarazo_puerperio', _ => p };
 
 /// Paciente del tablero, del expediente o del QR -> mapa plano {id, nombre, edad, semaforo, programas, cuidador, ...}
 Map<String, dynamic> normalizarPaciente(dynamic r) {

@@ -181,6 +181,11 @@ class Api {
   Future<dynamic> qrRegistro(String codigo) => _get('/registro/qr/$codigo');
   Future<dynamic> clinicas() => _get('/clinicas');
   Future<dynamic> actualizarPaciente(String id, Map<String, dynamic> b) => _patch('/pacientes/$id', b);
+
+  /// Solo para la pantalla "Diagnóstico de conexión": GET sin normalizar. Un estado no 2xx no lanza error
+  /// (tampoco cierra la sesión por 401); se devuelve la respuesta tal cual para describir su forma.
+  Future<Response<dynamic>> crudo(String ruta, [Map<String, dynamic>? q]) =>
+      _d.get(ruta, queryParameters: q?..removeWhere((_, v) => v == null), options: Options(validateStatus: (_) => true));
 }
 
 final apiProvider = Provider<Api>((_) => Api());

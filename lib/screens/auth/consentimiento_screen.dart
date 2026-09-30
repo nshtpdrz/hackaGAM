@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api.dart';
+import '../../core/state.dart';
 import '../../core/theme.dart';
 import '../../widgets/components.dart';
 import '../../core/tr.dart';
@@ -31,8 +32,12 @@ class _ConsentState extends ConsumerState<ConsentimientoScreen> {
         Text(tr('Aviso de privacidad'), style: h), const SizedBox(height: 8),
         // Texto oficial de la API si existe; si no, el provisional del catálogo.
         ref.watch(avisoPrivacidadProvider).maybeWhen(
-          data: (a) => a['texto'] == null ? const MsgText('consent.privacidad') : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${a['texto']}', style: Theme.of(c).textTheme.bodyLarge),
+          // El servidor manda el aviso como mensaje_clave (privacidad.aviso) + marco legal; si falta, texto provisional.
+          data: (a) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (a['texto'] != null) Text('${a['texto']}', style: Theme.of(c).textTheme.bodyLarge)
+            else MsgText('${a['mensaje_clave'] ?? 'consent.privacidad'}', respaldo: ref.watch(trProvider)('consent.privacidad').text),
+            if (a['marco'] is List && (a['marco'] as List).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8),
+              child: Text(tr('Marco legal: {m}', {'m': (a['marco'] as List).join(' · ')}), style: Theme.of(c).textTheme.bodySmall)),
             if (a['version'] != null) Text(tr('Versión {v}', {'v': a['version']}), style: Theme.of(c).textTheme.bodySmall)]),
           orElse: () => const MsgText('consent.privacidad')),
         CheckboxListTile(contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading, value: priv,

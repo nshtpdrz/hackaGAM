@@ -27,11 +27,11 @@ class MockInterceptor extends Interceptor {
   static final _pacientes = <String, Map<String, dynamic>>{
     '1': {'id': '1', 'perfil': {'nombre': 'María Demo López', 'fecha_nacimiento': '1996-03-12', 'sexo': 'F', 'tipo_sangre': 'O+',
       'alergias': ['Penicilina'], 'telefono': '771 000 0001', 'correo': 'maria@demo.invalid'}, 'semaforo': 'ambar', 'alertas_abiertas': 1,
-      'programas': [{'programa': 'embarazo'}], 'cuidadores': [{'nombre': 'Pedro Demo', 'telefono': '771 000 0010', 'parentesco': 'esposo'}],
+      'programas': [{'programa': 'embarazo_puerperio'}], 'cuidadores': [{'nombre': 'Pedro Demo', 'telefono': '771 000 0010', 'parentesco': 'esposo'}],
       'codigo_qr': 'PQR-DEMO-maria-embarazo'},
     '2': {'id': '2', 'perfil': {'nombre': 'Juan Demo Ruiz', 'fecha_nacimiento': '1958-07-02', 'sexo': 'M', 'tipo_sangre': 'A+',
       'alergias': [], 'telefono': '771 000 0002'}, 'semaforo': 'rojo', 'alertas_abiertas': 1,
-      'programas': [{'programa': 'cronicas'}, {'programa': 'oncologia'}], 'cuidadores': [{'nombre': 'Rosa Demo', 'telefono': '771 000 0011', 'parentesco': 'sobrina'}],
+      'programas': [{'programa': 'cronicas'}], 'cuidadores': [{'nombre': 'Rosa Demo', 'telefono': '771 000 0011', 'parentesco': 'sobrina'}],
       'codigo_qr': 'PQR-DEMO-juan-oncologia'},
     '3': {'id': '3', 'perfil': {'nombre': 'Carmen Demo Sánchez', 'fecha_nacimiento': '1954-01-20', 'sexo': 'F', 'tipo_sangre': 'B+',
       'alergias': ['Sulfas (sulfonamidas)'], 'telefono': '771 000 0003'}, 'semaforo': 'verde', 'alertas_abiertas': 0,
@@ -143,7 +143,9 @@ class MockInterceptor extends Interceptor {
       return {'usuario': usuario, 'pacientes_a_cargo': aCargo, if (_prefs.isNotEmpty) 'preferencias': _prefs};
     }
     if (r('/dispositivos')) return {'ok': true};
-    if (r('/aviso-privacidad')) return {'version': '2026-09-demo', 'texto': null}; // la app usa su texto provisional
+    // Misma forma que el servidor: el texto viaja por mensaje_clave (GET /mensajes).
+    if (r('/aviso-privacidad')) return {'version': '2026-09-29', 'mensaje_clave': 'privacidad.aviso',
+      'marco': ['LFPDPPP: los datos de salud son sensibles', 'NOM-004-SSA3-2012', 'NOM-024-SSA3-2012']};
     if (r('/mensajes')) {
       // Demo: en otomí aún no hay frases validadas; la API responde con respaldo en español y aviso de intérprete.
       if (q['lengua'] != 'ote') return {'mensajes': []};

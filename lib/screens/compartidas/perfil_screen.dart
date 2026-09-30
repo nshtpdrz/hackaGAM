@@ -56,6 +56,7 @@ class PerfilScreen extends ConsumerWidget { const PerfilScreen({super.key});
         if (s.role != Role.equipo) _tile(Icons.qr_code, tr('Mi código QR'), () => c.push('/qr')),
         if (s.role != Role.equipo) _tile(Icons.healing_outlined, tr('Seguimiento de heridas'), () => c.push('/heridas')),
         const _BioTile(),
+        _tile(Icons.network_check, tr('Diagnóstico de conexión'), () => c.push('/diagnostico')),
         _tile(Icons.logout, tr('Cerrar sesión'), () async {
           if (await ConfirmationDialog.show(c, titulo: tr('¿Cerrar sesión?'), mensaje: tr('Tendrás que iniciar sesión otra vez.'))) {
             ref.read(sessionProvider.notifier).logout(); } })]);

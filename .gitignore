@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Configuración local del servidor (URL y contraseña de demo): no se sube al repositorio
+config/api.json

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/api.dart';
 import '../../core/biometria.dart';
 import '../../core/mock_api.dart';
@@ -43,7 +42,9 @@ class _LoginState extends ConsumerState<LoginScreen> {
       BigButton(t('login.go').text, onTap: _busy ? null : () async {
         setState(() { _busy = true; _err = null; });
         try { await ref.read(sessionProvider.notifier).login(_e.text.trim(), _p.text); }
-        catch (e) { setState(() => _err = isNetworkError(e) ? tr('No hay conexión con el servidor. Revisa el cable o la red.')
+        // En el login, un 401 siempre es correo o contraseña incorrectos (salvo cuenta desactivada).
+        catch (e) { final x = errorApi(e); setState(() => _err = isNetworkError(e) ? tr('No hay conexión con el servidor. Revisa el cable o la red.')
+            : x?.estado == 401 && x?.codigo != 'usuario_inactivo' ? tr('Correo o contraseña incorrectos')
             : mensajeError(e) ?? tr('Correo o contraseña incorrectos')); }
         if (mounted) setState(() => _busy = false); }),
       const SizedBox(height: 12), BigButton(t('login.bio').text, icon: Icons.fingerprint, secondary: true, onTap: () async {

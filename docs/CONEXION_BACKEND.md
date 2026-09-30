@@ -7,6 +7,9 @@ campo, se corrige solo en ese archivo.
 ## Cómo correrla
 
 ```bash
+# Servidor de demo desde un archivo local (recomendado): copia config/api.example.json a config/api.json,
+# pon la URL y la contraseña de la guía (config/api.json no se sube: está en .gitignore) y corre:
+flutter run -d chrome --web-port 8080 --dart-define-from-file=config/api.json
 # Servidor de demo (la URL está en la guía de integración; no se guarda en el repositorio)
 flutter run --dart-define=API_URL=<URL de la guía> --dart-define=DEMO_PASSWORD=<contraseña de la guía>
 # Teléfono por USB (con la API corriendo y adb reverse tcp:3000 tcp:3000)

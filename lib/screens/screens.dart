@@ -12,6 +12,7 @@ export 'compartidas/notificaciones_screen.dart';
 export 'compartidas/alerta_detalle_screen.dart';
 export 'compartidas/receta_flow_screen.dart';
 export 'compartidas/pendientes_screen.dart';
+export 'compartidas/diagnostico_screen.dart';
 export 'cuidador/alertas_screen.dart';
 export 'equipo/escaner_qr_screen.dart';
 export 'equipo/expediente_screen.dart';
