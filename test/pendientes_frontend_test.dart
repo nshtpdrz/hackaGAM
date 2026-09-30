@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:dio/dio.dart';
+import 'dart:ui' show Tristate;
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -71,10 +72,10 @@ void main() {
       BigButton('Guardar', onTap: () => n++), const BigButton('Enviar')]))));
     final activo = t.getSemantics(find.byType(BigButton).first);
     expect(activo.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
-    t.binding.pipelineOwner.semanticsOwner!.performAction(activo.id, SemanticsAction.tap);
+    activo.owner!.performAction(activo.id, SemanticsAction.tap);
     expect(n, 1);
     final inactivo = t.getSemantics(find.byType(BigButton).last).getSemanticsData();
-    expect(inactivo.hasFlag(SemanticsFlag.hasEnabledState) && !inactivo.hasFlag(SemanticsFlag.isEnabled), isTrue);
+    expect(inactivo.flagsCollection.isEnabled, Tristate.isFalse); // tiene estado y está desactivado
     h.dispose();
   });
   test('telefonoMarcable: acepta teléfonos y descarta correos', () {

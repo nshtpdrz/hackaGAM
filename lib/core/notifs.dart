@@ -16,7 +16,8 @@ final leidasProvider = StateProvider<Set<String>>((ref) {
       if (v is List && v.isNotEmpty) ref.controller.state = {...v.map((e) => '$e'), ...ref.controller.state};
     } catch (_) {} // ya se cerró sesión
   });
-  ref.listenSelf((_, n) {
+  // ignore: deprecated_member_use
+  ref.listenSelf((_, n) { // (Riverpod 3 lo cambia por Notifier.listenSelf)
     if (!cargado) return; // no se pisa lo guardado antes de leerlo
     final l = n.toList(); almacen.guardar(k, l.length > 300 ? l.sublist(l.length - 300) : l);
   });

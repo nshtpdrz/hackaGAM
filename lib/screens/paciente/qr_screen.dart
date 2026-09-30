@@ -18,7 +18,7 @@ class QrScreen extends ConsumerWidget { const QrScreen({super.key});
           Text(tr('Código'), style: Theme.of(c).textTheme.bodySmall),
           SelectableText('${d['token']}', textAlign: TextAlign.center,
             style: Theme.of(c).textTheme.headlineSmall?.copyWith(letterSpacing: 2, fontWeight: FontWeight.w700))])),
-      Padding(padding: EdgeInsets.all(24), child: Text(tr('Muestra este código en la clínica para identificarte en consulta'),
+      Padding(padding: const EdgeInsets.all(24), child: Text(tr('Muestra este código en la clínica para identificarte en consulta'),
         textAlign: TextAlign.center))]))));
 }
 
