@@ -44,10 +44,34 @@ void main() {
     expect(find.text('Cédula profesional'), findsOneWidget);
     await t.enterText(find.widgetWithText(TextField, 'Nombre completo'), 'Ana Torres');
     await t.enterText(find.widgetWithText(TextField, 'Correo electrónico'), 'ana@demo.com');
-    await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.obscureText), 'secreto123');
-    await t.enterText(find.widgetWithText(TextField, 'Cédula profesional'), '12');
+    final claves = find.byWidgetPredicate((w) => w is TextField && w.obscureText);
+    await t.enterText(claves.first, 'secreto123');
+    await t.enterText(claves.last, 'secreto124');
+    await t.tap(find.text('Completar Registro')); await t.pumpAndSettle();
+    expect(find.text('Las contraseñas no coinciden.'), findsOneWidget);
+
+    await t.enterText(claves.last, 'secreto123');
+    await t.enterText(find.widgetWithText(TextField, 'Cédula profesional'), '12ab');
+    expect(find.text('12'), findsOneWidget); // solo acepta dígitos
     await t.tap(find.text('Completar Registro')); await t.pumpAndSettle();
     expect(find.text('La cédula profesional debe tener 7 u 8 dígitos.'), findsOneWidget);
+
+    await t.enterText(find.widgetWithText(TextField, 'Cédula profesional'), '12345678');
+    await t.enterText(find.widgetWithText(TextField, 'Clínica o Institución médica'), 'Centro de Salud Demo');
+    await t.tap(find.text('Completar Registro'));
+    await t.pump();
+    expect(find.text('Completar Registro'), findsOneWidget); // no se anuncia éxito antes de que responda la API
+    await t.pump(const Duration(milliseconds: 400)); // mock de la API
+    await t.pumpAndSettle();
+    expect(find.text('Completar Registro'), findsNothing); // la cuenta se creó (mock) y volvió al inicio de sesión
+  });
+
+  testWidgets('Registro: rechaza correo inválido y contraseña sin números antes de llamar a la API', (t) async {
+    await _abrirRegistro(t);
+    await t.enterText(find.widgetWithText(TextField, 'Nombre completo'), 'Ana Torres');
+    await t.enterText(find.widgetWithText(TextField, 'Correo electrónico'), 'ana@demo');
+    await t.tap(find.text('Completar Registro')); await t.pumpAndSettle();
+    expect(find.textContaining('Escribe un correo válido'), findsOneWidget);
   });
 
   testWidgets('Lector QR: un código que falla muestra el error y permite reintentar', (t) async {

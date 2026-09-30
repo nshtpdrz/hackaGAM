@@ -68,9 +68,22 @@ Funcionan en modo demo. Con la API real regresan 404 y la app avisa. Hay que aco
 
 | Función en la app | Petición que usa la app | Nota |
 |---|---|---|
-| Crear cuenta desde la app | `POST /auth/registro` | En la guía las cuentas las crea el admin (personal) o el equipo (pacientes). |
+| Crear cuenta desde la app | `POST /auth/registro` `{nombre, correo, telefono, contrasena, rol: paciente\|cuidador\|medico, …}` | En la guía las cuentas las crea el admin (personal) o el equipo (pacientes). La app solo anuncia éxito si la API responde 2xx; con 404/405 dice que el registro en línea no está disponible y con 409 que el correo ya existe. Paciente agrega `fecha_nacimiento, sexo, tipo_sangre?, alergias[], programas[{programa}]`; cuidador `codigo_qr`; médico `cedula_profesional, clinica`. |
 | Registro de cuidador escaneando el QR del paciente | `GET /registro/qr/:codigo` (sin sesión) | Debe regresar datos mínimos: nombre corto del paciente y cuidador asignado. |
 | Lista de clínicas en el registro de médico | `GET /clinicas` | |
 | Editar perfil propio | `PATCH /auth/yo`, `PATCH /pacientes/:id` | |
 | Foto de perfil | `POST /auth/yo/foto` (multipart `foto`) → `{foto_url}` | |
 | Preferencias elegidas por el equipo en el alta | `PUT /pacientes/:id/preferencias` | La guía solo permite este endpoint a paciente y cuidador; hoy la app lo intenta y, si falla, lo ignora. |
+
+## Validación en la app (la API debe repetirla)
+
+La app valida antes de enviar (`lib/core/validacion.dart`), pero la API es la que decide: cualquier regla de aquí debe estar también en zod.
+
+- **Credenciales:** correo con formato válido y en minúsculas; contraseña nueva de 8 a 72 caracteres (límite de bcrypt) con letras y números; cédula de 7 u 8 dígitos. Las cédulas de demo (`DEMO-…`) no pasan esa validación en el registro, pero sí funcionan en las cuentas que crea el admin.
+- **Cédula verificada:** si `GET /auth/yo` no trae `cedula_verificada`, la app supone que la clínica registró la cédula y la insignia lo dice así ("registrada por tu clínica"). Si se agrega el registro abierto, la API **debe** mandar `cedula_verificada` (idealmente cotejada con el Registro Nacional de Profesionistas).
+- **Perfil y alta:** nombre y apellido; teléfono de 10 dígitos (se envía solo con dígitos); fecha de nacimiento no futura ni de más de 120 años; embarazo solo con sexo F y edad de 10 a 60 años; adulto mayor desde 60 años. "No sé" en tipo de sangre no se envía.
+- **Consentimiento:** el alta ya no envía la versión `'1'` cuando falla `GET /aviso-privacidad`: se detiene y pide reintentar. La firma escrita (nombre completo) se valida, pero **no se envía**: la guía no tiene campo para ella (propuesta: `consentimiento.firmado_por`).
+- **Mediciones:** se rechazan valores imposibles (sistólica 50–300, diastólica 20–200, glucosa 20–600, peso 2–350, temperatura 30–45, frecuencia cardiaca 25–250) y se pide confirmar los raros antes de enviarlos. Un valor real y peligroso se envía igual después de confirmar.
+- **MEDMAP:** no se puede confirmar con discrepancias sin resolver ni con medicamentos sin horario (salvo los `por_revisar`); los horarios repetidos se quitan.
+- **QR:** solo se aceptan códigos con letras, números, `-` y `_` (4 a 200 caracteres) y van codificados en la ruta.
+- **Errores 400:** la app nombra los campos que vienen en `error.campos` (p. ej. `registros.0.valor_num` → "valor").

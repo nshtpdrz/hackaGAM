@@ -80,7 +80,7 @@ class _NuevaHeridaState extends ConsumerState<NuevaHeridaScreen> {
       SectionLabel(tr('Lado')),
       ChoiceWrap(options: ladosCuerpo, isSel: (k) => lado == k, onTap: (k) => setState(() => lado = k)),
       const SizedBox(height: 16),
-      AppField(_desc, tr('Descripción (opcional)'))])),
+      AppField(_desc, tr('Descripción (opcional)'), maxLength: 300)])),
     if (err != null) Semantics(liveRegion: true, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Text(err!, style: const TextStyle(color: C.error, fontWeight: FontWeight.w600)))),
     Padding(padding: const EdgeInsets.all(16), child: BigButton(tr('Guardar'), icon: Icons.check, onTap: busy ? null : _guardar))]), bell: false);

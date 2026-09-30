@@ -12,12 +12,31 @@ import '../../core/api_modelos.dart';
 import '../../core/sync.dart';
 import '../../widgets/sync_status.dart';
 import '../../widgets/marca.dart';
+import '../../core/validacion.dart';
 
 // 1. Login (biometría: local_auth desbloqueará el token guardado; pendiente)
 class LoginScreen extends ConsumerStatefulWidget { const LoginScreen({super.key});
   @override ConsumerState<LoginScreen> createState() => _LoginState(); }
 class _LoginState extends ConsumerState<LoginScreen> {
   final _e = TextEditingController(), _p = TextEditingController(); String? _err; bool _busy = false;
+  @override
+  void dispose() { _e.dispose(); _p.dispose(); super.dispose(); }
+
+  Future<void> _entrar() async {
+    if (_busy) return;
+    // Antes de ir al servidor: correo con formato válido y contraseña escrita (evita gastar intentos; hay límite por IP).
+    final correo = _e.text.trim().toLowerCase();
+    final e = validarCorreo(correo) ?? (_p.text.isEmpty ? tr('Escribe tu contraseña.') : null);
+    if (e != null) { setState(() => _err = e); return; }
+    setState(() { _busy = true; _err = null; });
+    try { await ref.read(sessionProvider.notifier).login(correo, _p.text); }
+    // En el login, un 401 es correo o contraseña incorrectos (salvo cuenta desactivada); otros errores no se disfrazan de eso.
+    catch (e) { final x = errorApi(e); if (mounted) setState(() => _err = isNetworkError(e) ? tr('No hay conexión con el servidor. Revisa el cable o la red.')
+        : x?.estado == 401 && x?.codigo != 'usuario_inactivo' ? tr('Correo o contraseña incorrectos')
+        : mensajeError(e) ?? tr('No se pudo iniciar sesión. Intenta de nuevo.')); }
+    if (mounted) setState(() => _busy = false);
+  }
+
   @override
   Widget build(BuildContext c) {
     final t = ref.watch(trProvider); final p = ref.watch(prefsProvider);
@@ -31,22 +50,18 @@ class _LoginState extends ConsumerState<LoginScreen> {
         const Expanded(child: Align(alignment: Alignment.centerLeft, child: LogoSenda(alto: 44)))]),
       const SizedBox(height: 12),
       const MsgText('app.tagline'), const EstadoServidor(), const SizedBox(height: 32),
-      TextField(controller: _e, keyboardType: TextInputType.emailAddress, decoration: InputDecoration(labelText: t('login.email').text)),
-      const SizedBox(height: 16),
-      TextField(controller: _p, obscureText: true, decoration: InputDecoration(labelText: t('login.pass').text)),
+      AutofillGroup(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        TextField(controller: _e, keyboardType: TextInputType.emailAddress, autocorrect: false, maxLength: 254,
+          autofillHints: const [AutofillHints.email, AutofillHints.username], textInputAction: TextInputAction.next,
+          decoration: InputDecoration(labelText: t('login.email').text, counterText: '')),
+        const SizedBox(height: 16),
+        CampoContrasena(_p, t('login.pass').text, alEnviar: (_) => _entrar())])),
       if (ref.watch(sessionExpiredProvider)) Semantics(liveRegion: true, child: Padding(padding: EdgeInsets.only(top: 12),
         child: Row(children: [Icon(Icons.lock_clock), SizedBox(width: 8), Expanded(child: Text(tr('Tu sesión expiró. Inicia sesión de nuevo.')))]))),
       if (_err != null) Padding(padding: const EdgeInsets.only(top: 12),
           child: Text(_err!, style: const TextStyle(color: C.error), semanticsLabel: tr('Error: {e}', {'e': _err}))),
       const SizedBox(height: 24),
-      BigButton(t('login.go').text, onTap: _busy ? null : () async {
-        setState(() { _busy = true; _err = null; });
-        try { await ref.read(sessionProvider.notifier).login(_e.text.trim(), _p.text); }
-        // En el login, un 401 siempre es correo o contraseña incorrectos (salvo cuenta desactivada).
-        catch (e) { final x = errorApi(e); setState(() => _err = isNetworkError(e) ? tr('No hay conexión con el servidor. Revisa el cable o la red.')
-            : x?.estado == 401 && x?.codigo != 'usuario_inactivo' ? tr('Correo o contraseña incorrectos')
-            : mensajeError(e) ?? tr('Correo o contraseña incorrectos')); }
-        if (mounted) setState(() => _busy = false); }),
+      BigButton(t('login.go').text, onTap: _busy ? null : _entrar),
       const SizedBox(height: 12), BigButton(t('login.bio').text, icon: Icons.fingerprint, secondary: true, onTap: () async {
         try {
           final ok = await readToken() != null && await biometriaActiva() && await autenticar();

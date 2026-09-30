@@ -6,6 +6,7 @@ import '../../core/state.dart';
 import '../../core/theme.dart';
 import '../../widgets/components.dart';
 import '../../core/tr.dart';
+import '../../core/validacion.dart';
 
 /// GET /aviso-privacidad (público) -> {version, texto}. La versión viaja en el consentimiento del alta.
 final avisoPrivacidadProvider = FutureProvider<Map<String, dynamic>>((ref) async {
@@ -24,7 +25,9 @@ class _ConsentState extends ConsumerState<ConsentimientoScreen> {
   void dispose() { _firma.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext c) {
-    final listo = priv && info && _firma.text.trim().length >= 3;
+    // La firma escrita debe ser un nombre completo (nombre y apellido), no unas cuantas letras.
+    final errFirma = _firma.text.trim().isEmpty ? null : validarNombre(_firma.text);
+    final listo = priv && info && _firma.text.trim().isNotEmpty && errFirma == null;
     final h = Theme.of(c).textTheme.headlineSmall;
     return Scaffold(
       appBar: AppBar(title: Text(tr('Privacidad y consentimiento')), backgroundColor: C.bg),
@@ -47,7 +50,7 @@ class _ConsentState extends ConsumerState<ConsentimientoScreen> {
           onChanged: (v) => setState(() => info = v ?? false), title: Text(tr('Acepto el seguimiento de mi salud en esta app'))),
         SectionLabel(widget.tutor ? tr('Firma del paciente o su representante') : tr('Tu firma')),
         TextField(controller: _firma, onChanged: (_) => setState(() {}), textCapitalization: TextCapitalization.words,
-          decoration: InputDecoration(labelText: tr('Escribe tu nombre completo'))),
+          maxLength: 100, decoration: InputDecoration(labelText: tr('Escribe tu nombre completo'), errorText: errFirma, counterText: '')),
         const SizedBox(height: 24),
         BigButton(tr('Aceptar y continuar'), onTap: listo ? () => c.pop(_firma.text.trim()) : null),
         const SizedBox(height: 12), BigButton(tr('No acepto'), secondary: true, onTap: () => c.pop())])));

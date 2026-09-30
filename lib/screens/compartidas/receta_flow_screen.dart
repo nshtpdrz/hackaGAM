@@ -57,8 +57,11 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
     }
   }
   // Los "por revisar" pueden ir sin dosis: el equipo los completa.
+  // Tampoco se avanza con dos lecturas distintas sin elegir: se guardaría una dosis que nadie confirmó.
   bool get _revisionOk => meds.isNotEmpty && meds.every((m) => '${m['nombre'] ?? ''}'.trim().isNotEmpty &&
-      (m['por_revisar'] == true || '${m['dosis'] ?? ''}'.trim().isNotEmpty));
+      (m['por_revisar'] == true || '${m['dosis'] ?? ''}'.trim().isNotEmpty) && (m['discrepancias'] as Map? ?? const {}).isEmpty);
+  /// Cada medicamento confirmado necesita al menos un horario (sin él no suena ningún recordatorio).
+  bool get _horariosOk => meds.every((m) => m['por_revisar'] == true || (m['horarios'] as List? ?? const []).isNotEmpty);
   List<String> _h(int i) => List<String>.from(meds[i]['horarios'] ?? const []);
   String _nombre(int i) => '${meds[i]['nombre']} ${meds[i]['concentracion'] ?? ''}'.trim();
 
@@ -190,12 +193,16 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
               style: Theme.of(context).textTheme.titleMedium?.copyWith(color: C.primary))),
             ..._avisosMed(i),
             OCRReviewCard(key: ValueKey(meds[i]['_k']), med: meds[i], onChanged: (m) => meds[i] = m, onDiscard: () => setState(() => meds.removeAt(i)))])),
-          if (!_revisionOk) Padding(padding: const EdgeInsets.only(top: 12), child: Text(meds.isEmpty ? tr('No queda ningún medicamento.') : tr('Completa nombre y dosis de cada medicamento.'), style: const TextStyle(color: C.error)))]);
+          if (!_revisionOk) Padding(padding: const EdgeInsets.only(top: 12), child: Text(meds.isEmpty ? tr('No queda ningún medicamento.')
+              : meds.any((m) => (m['discrepancias'] as Map? ?? const {}).isNotEmpty) ? tr('Elige la lectura correcta donde hay dos opciones.')
+              : tr('Completa nombre y dosis de cada medicamento.'), style: const TextStyle(color: C.error)))]);
       case 4:
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(tr('Estos son los horarios propuestos. Cámbialos si hace falta; a esas horas sonará un recordatorio en tu teléfono.'), style: t.bodyLarge),
           for (var i = 0; i < meds.length; i++) Padding(padding: const EdgeInsets.only(top: 12), child: MedicationSchedule(
-            medicamento: _nombre(i), horarios: _h(i), onChanged: (l) => setState(() => meds[i] = {...meds[i], 'horarios': l})))]);
+            medicamento: _nombre(i), horarios: _h(i), onChanged: (l) => setState(() => meds[i] = {...meds[i], 'horarios': l}))),
+          if (!_horariosOk) Padding(padding: const EdgeInsets.only(top: 12),
+            child: Text(tr('Agrega al menos un horario a cada medicamento.'), style: const TextStyle(color: C.error)))]);
       case 5:
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(tr('Revisa que todo sea correcto:'), style: t.bodyLarge),
@@ -214,7 +221,7 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
       0 => Row(children: [sig(tr('Analizar receta'), _listo ? _procesar : null)]),
       2 => Row(children: [sig(tr('Revisar medicamentos'), meds.isEmpty ? null : () => setState(() => paso = 3))]),
       3 => Row(children: [atras(), const SizedBox(width: 12), sig(tr('Siguiente'), _revisionOk ? () => setState(() => paso = 4) : null)]),
-      4 => Row(children: [atras(), const SizedBox(width: 12), sig(tr('Siguiente'), () => setState(() => paso = 5))]),
+      4 => Row(children: [atras(), const SizedBox(width: 12), sig(tr('Siguiente'), _horariosOk ? () => setState(() => paso = 5) : null)]),
       5 => Row(children: [atras(), const SizedBox(width: 12), sig(tr('Confirmar y guardar'), busy ? null : _confirmar)]),
       6 => Row(children: [sig(tr('Listo'), () => context.pop())]),
       _ => const SizedBox.shrink() };

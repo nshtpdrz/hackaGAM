@@ -39,7 +39,7 @@ class MedicationSchedule extends StatelessWidget {
     final s = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
     final l = [...horarios];
     if (i == null) { l.add(s); } else { l[i] = s; }
-    l.sort(); onChanged(l);
+    onChanged(l.toSet().toList()..sort()); // sin horarios repetidos (sonarían dos alarmas a la misma hora)
   }
   @override
   Widget build(BuildContext c) => InfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

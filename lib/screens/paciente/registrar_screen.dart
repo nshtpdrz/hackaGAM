@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api.dart';
@@ -9,6 +10,8 @@ import '../../widgets/components.dart';
 import '../shared.dart';
 import '../../core/tr.dart';
 import '../../core/escala_texto.dart';
+import '../../core/validacion.dart';
+import '../../widgets/dialogs.dart';
 
 /// Escala de síntomas de la API: 0 = no … 4 = muy fuerte.
 const _escala = ['No', 'Leve', 'Moderado', 'Fuerte', 'Muy fuerte'];
@@ -38,15 +41,33 @@ class _RegState extends ConsumerState<RegistrarScreen> {
       if (_sintoma == null) return tr('Elige una opción.');
       resp[variable] = _sintoma!; return null;
     }
-    final a = num.tryParse(_a.text.replaceAll(',', '.'));
+    final a = num.tryParse(_a.text.trim().replaceAll(',', '.'));
     if (variable == 'presion') {
-      final b = num.tryParse(_b.text.replaceAll(',', '.'));
+      final b = num.tryParse(_b.text.trim().replaceAll(',', '.'));
       if (a == null || b == null) return tr('Escribe los dos números de la presión.');
-      if (b >= a) return tr('El número de arriba debe ser mayor que el de abajo.');
+      final e = validarPresion(a, b); if (e != null) return e;
       resp[variable] = [a, b]; return null;
     }
     if (a == null) return tr('Escribe el número.');
+    // Fuera de lo físicamente posible es un error de dedo (p. ej. 1200 en vez de 120): no se envía.
+    final e = validarMedicion(variable, a); if (e != null) return e;
     resp[variable] = a; return null;
+  }
+
+  /// Valor posible pero raro: se pide confirmar el número (un error de dedo generaría una alerta falsa;
+  /// un valor real y peligroso se envía igual después de confirmar).
+  bool _inusual(Map q) {
+    final v = resp['${q['variable']}'];
+    if (q['tipo'] == 'sintoma') return false;
+    return v is List ? presionInusual(v[0] as num, v[1] as num) : v is num && medicionInusual('${q['variable']}', v);
+  }
+
+  Future<bool> _confirmarInusual(Map q) async {
+    final v = resp['${q['variable']}'];
+    final texto = v is List ? '${v[0]}/${v[1]}' : '$v';
+    return ConfirmationDialog.show(context, titulo: tr('¿Es correcto {v} {u}?', {'v': texto, 'u': '${q['unidad'] ?? ''}'}),
+        mensaje: tr('Es un valor poco común. Revisa que lo escribiste igual que en el aparato.'),
+        ok: tr('Sí, es correcto'), cancel: tr('Corregir'));
   }
 
   Future<void> _enviar(List qs) async {
@@ -76,13 +97,14 @@ class _RegState extends ConsumerState<RegistrarScreen> {
           onTap: () => setState(() => _sintoma = n)))]);
     }
     const kt = TextInputType.numberWithOptions(decimal: true);
+    final solo = [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')), LengthLimitingTextInputFormatter(6)];
     if (q['variable'] == 'presion') {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        TextField(controller: _a, autofocus: true, keyboardType: kt, style: big, textAlign: TextAlign.center, decoration: dec('Arriba (sistólica)')),
+        TextField(controller: _a, autofocus: true, keyboardType: kt, style: big, textAlign: TextAlign.center, inputFormatters: solo, decoration: dec('Arriba (sistólica)')),
         const SizedBox(height: 16),
-        TextField(controller: _b, keyboardType: kt, style: big, textAlign: TextAlign.center, decoration: dec('Abajo (diastólica)'))]);
+        TextField(controller: _b, keyboardType: kt, style: big, textAlign: TextAlign.center, inputFormatters: solo, decoration: dec('Abajo (diastólica)'))]);
     }
-    return TextField(controller: _a, autofocus: true, keyboardType: kt, style: big, textAlign: TextAlign.center, decoration: dec(null));
+    return TextField(controller: _a, autofocus: true, keyboardType: kt, style: big, textAlign: TextAlign.center, inputFormatters: solo, decoration: dec(null));
   }
 
   @override
@@ -98,9 +120,11 @@ class _RegState extends ConsumerState<RegistrarScreen> {
       Expanded(child: QuestionStep(index: i, total: qs.length, questionKey: '${q['message_key']}', respaldo: q['respaldo'], last: ultima,
         input: _entrada(c, q),
         onPrev: i > 0 && !busy ? () { setState(() { i--; _cargar(qs[i]); err = null; }); } : null,
-        onNext: busy ? null : () {
+        onNext: busy ? null : () async {
           final e = _guardarRespuesta(q);
           if (e != null) { setState(() => err = e); return; }
+          if (_inusual(q) && !await _confirmarInusual(q)) { resp.remove('${q['variable']}'); return; }
+          if (!mounted) return;
           if (!ultima) { setState(() { i++; _cargar(qs[i]); err = null; }); return; }
           _enviar(qs);
         })),

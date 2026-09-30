@@ -50,6 +50,19 @@ ErrorApi? errorApi(Object e) {
   return ErrorApi(e.response!.statusCode, err['codigo']?.toString(), err['mensaje']?.toString(), _m(err['campos']));
 }
 
+/// Nombres legibles de los campos que la API marca en un 400 (clave raíz, sin índices ni rutas).
+const _nombresCampo = {
+  'correo': 'correo', 'contrasena': 'contraseña', 'nombre': 'nombre', 'telefono': 'teléfono',
+  'fecha_nacimiento': 'fecha de nacimiento', 'sexo': 'sexo', 'tipo_sangre': 'tipo de sangre', 'alergias': 'alergias',
+  'programas': 'programa de cuidado', 'cuidador': 'cuidador', 'consentimiento': 'consentimiento',
+  'cedula': 'cédula profesional', 'cedula_profesional': 'cédula profesional',
+  'valor_num': 'valor', 'valor_num2': 'segundo valor', 'escala': 'respuesta', 'tomado_en': 'hora de la medición',
+  'variable': 'medición', 'registros': 'registros', 'tomas': 'tomas', 'dosis': 'dosis', 'frecuencia': 'frecuencia',
+  'horarios': 'horarios', 'medicamentos': 'medicamentos', 'archivo': 'foto', 'texto': 'texto de la receta',
+  'tipo': 'tipo', 'zona_corporal': 'zona del cuerpo', 'lado': 'lado', 'descripcion': 'descripción'};
+/// "registros.0.valor_num" o "registros[0].valor_num" -> "valor_num".
+String _raizCampo(String k) => k.split(RegExp(r'[.\[\]]')).lastWhere((p) => p.isNotEmpty && int.tryParse(p) == null, orElse: () => k);
+
 /// Texto para la persona según el código de error (la API nunca manda texto para el paciente).
 String? mensajeError(Object e) {
   final x = errorApi(e); if (x == null) return null;
@@ -63,7 +76,9 @@ String? mensajeError(Object e) {
     'ocr_no_disponible' => tr('La lectura automática no está disponible. Escribe la receta.'),
     'demasiados_intentos' => tr('Demasiados intentos. Espera un momento.'),
     _ => switch (x.estado) {
-      400 => tr('Revisa los datos marcados.'),
+      // 400 trae en campos qué falló: se nombran para que la persona sepa qué corregir.
+      400 => x.campos.isEmpty ? tr('Revisa los datos e intenta de nuevo.')
+          : tr('Revisa: {campos}.', {'campos': x.campos.keys.map((k) => tr(_nombresCampo[_raizCampo('$k')] ?? '$k')).toSet().join(', ')}),
       401 => x.codigo == null ? tr('Correo o contraseña incorrectos') : tr('Tu sesión expiró. Inicia sesión de nuevo.'),
       403 => tr('Tu cuenta no puede ver esta información.'),
       404 => tr('No se encontró la información.'),
@@ -90,6 +105,8 @@ Map<String, dynamic> normalizarYo(dynamic r) {
     // SUPUESTO: la guía no define un campo de verificación; las cuentas de médico las da de alta el admin
     // de la clínica con su cédula, así que se consideran verificadas si traen cédula.
     'cedula_verificada': u['cedula_verificada'] ?? (u['rol'] == 'medico' && _s(u, ['cedula_profesional', 'cedula']) != null),
+    // Si la API no manda la verificación, la insignia aclara que la cédula la registró la clínica (no una consulta a la SEP).
+    'cedula_por_clinica': u['cedula_verificada'] == null,
     'pacientes_a_cargo': aCargo, 'paciente_id': aCargo.isEmpty ? null : aCargo.first['id'],
     'preferencias': m['preferencias'] ?? u['preferencias']};
 }
@@ -388,7 +405,8 @@ String? pacienteDeQr(dynamic r) { final m = _m(r);
   return (_p(m, ['paciente_id']) ?? _m(m['paciente'])['id'] ?? m['id'])?.toString(); }
 
 /// Alta de paciente (POST /pacientes): perfil + programas[] + cuidador? + consentimiento{version, aceptado:true}.
-Map<String, dynamic> altaPacienteParaApi(Map d, {String? versionAviso}) => {
+/// [versionAviso] es la versión del aviso que se mostró: sin ella no se registra el consentimiento.
+Map<String, dynamic> altaPacienteParaApi(Map d, {required String versionAviso}) => {
   'nombre': d['nombre'], 'fecha_nacimiento': d['fecha_nacimiento'], 'sexo': d['sexo'],
   if (d['tipo_sangre'] != null) 'tipo_sangre': d['tipo_sangre'],
   if (d['alergias'] != null && '${d['alergias']}'.isNotEmpty) 'alergias': d['alergias'],
@@ -396,7 +414,7 @@ Map<String, dynamic> altaPacienteParaApi(Map d, {String? versionAviso}) => {
   'programas': [for (final p in (d['programas'] as List? ?? const [])) {'programa': programaApi('$p')}],
   if (d['cuidador'] is Map && '${(d['cuidador'] as Map)['nombre'] ?? ''}'.isNotEmpty)
     'cuidador': {'nombre': (d['cuidador'] as Map)['nombre'], 'telefono': (d['cuidador'] as Map)['contacto']},
-  'consentimiento': {'version': versionAviso ?? '1', 'aceptado': true}};
+  'consentimiento': {'version': versionAviso, 'aceptado': true}};
 
 // ---------- catálogo de mensajes ----------
 
