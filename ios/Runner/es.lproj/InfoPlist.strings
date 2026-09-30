@@ -1,0 +1,4 @@
+/* Textos de permisos de iOS en español (iguales a Info.plist). */
+"NSCameraUsageDescription" = "SENDA usa la cámara para escanear códigos QR, fotografiar recetas, cajas de medicamentos y heridas, y tomar tu foto de perfil.";
+"NSPhotoLibraryUsageDescription" = "SENDA usa tus fotos para elegir la imagen de una receta, de una caja de medicamento, de una herida o tu foto de perfil.";
+"NSFaceIDUsageDescription" = "SENDA usa Face ID para que entres de forma rápida y segura.";

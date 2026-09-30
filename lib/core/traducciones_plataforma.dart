@@ -97,4 +97,26 @@ const Map<String, Map<String, String>> traduccionesPlataforma = {'en': {
   'Elige qué mediciones pedir, cada cuándo y en qué rango están bien. Fuera de rango, el registro avisa a tu equipo.': 'Choose which measurements to request, how often and which range is fine. Out of range, the reading alerts your team.',
   'Guardando…': 'Saving…',
   'Guardar plan': 'Save plan',
+  // Aviso de privacidad (consentimiento_screen.dart, alta_paciente_screen.dart)
+  'No se recibió la versión del aviso de privacidad. Intenta más tarde.': 'The privacy notice version was not received. Try again later.',
+  'No se pudo cargar el aviso de privacidad. Sin él no se puede continuar.': 'The privacy notice could not be loaded. You cannot continue without it.',
+  // Copia sin conexión y Hoy sin tomas (shared.dart, hoy_screen.dart)
+  'Sin conexión. Mostramos lo último guardado ({fecha} {hora}).': 'No connection. Showing the last saved data ({fecha} {hora}).',
+  'Hoy no tienes tomas de medicamento.': 'You have no medication doses today.',
+  // Valores poco probables al registrar (registrar_screen.dart)
+  '¿Tu presión de arriba es {n}?': 'Is your top blood pressure number {n}?',
+  '¿Tu presión de abajo es {n}?': 'Is your bottom blood pressure number {n}?',
+  '¿Tu {v} es {n} {u}?': 'Is your {v} {n} {u}?',
+  'Revisa el número': 'Check the number',
+  'Si es correcto, confírmalo; si no, corrígelo.': 'If it is correct, confirm it; if not, fix it.',
+  'Sí, es correcto': 'Yes, it is correct',
+  'Corregir': 'Fix it',
+  // Código bajo el QR y programa Oncología
+  'Código': 'Code',
+  'Oncología': 'Oncology',
+  // Salir del flujo de receta (receta_flow_screen.dart)
+  '¿Salir de la receta?': 'Leave the prescription?',
+  'Se perderá lo que ya se leyó y revisaste.': 'What was read and what you reviewed will be lost.',
+  'Salir': 'Leave',
+  'Seguir aquí': 'Stay here',
 }};

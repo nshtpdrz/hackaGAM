@@ -29,7 +29,7 @@ class _MsgAudioState extends ConsumerState<MsgAudioPlayer> {
     await _tts.setLanguage(lang == 'en' ? 'en-US' : 'es-MX'); await _tts.speak(m.text);
   }
   @override
-  Widget build(BuildContext c) => Semantics(button: true, label: playing ? tr('Detener audio') : tr('Escuchar indicaciones'), excludeSemantics: true,
+  Widget build(BuildContext c) => Semantics(button: true, label: playing ? tr('Detener audio') : tr('Escuchar indicaciones'), enabled: true, onTap: _toggle, excludeSemantics: true,
     child: FilledButton.tonalIcon(onPressed: _toggle, icon: Icon(playing ? Icons.stop_circle_outlined : Icons.volume_up_rounded),
-      label: Text(playing ? tr('Detener') : tr('Escuchar indicaciones'), style: TextStyle(color: Colors.white))));
+      label: Text(playing ? tr('Detener') : tr('Escuchar indicaciones')))); // color del tema: se lee sobre el fondo claro
 }

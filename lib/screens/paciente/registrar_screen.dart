@@ -6,9 +6,30 @@ import '../../core/api_modelos.dart';
 import '../../core/sync.dart';
 import '../../core/theme.dart';
 import '../../widgets/components.dart';
+import '../../widgets/dialogs.dart';
 import '../shared.dart';
 import '../../core/tr.dart';
 import '../../core/escala_texto.dart';
+
+/// Rangos en los que un valor es creíble. Fuera de ellos lo más probable es un error de dedo (1200/80, glucosa 5):
+/// se pide confirmar antes de guardar. Rangos amplios a propósito; ajustar con el equipo clínico.
+const rangosCreibles = {'sistolica': (60, 250), 'diastolica': (30, 150), 'glucosa': (30, 600),
+  'peso': (2, 300), 'temperatura': (34, 42), 'frecuencia_cardiaca': (30, 220)};
+
+/// Pregunta de confirmación (ya traducida) si [valor] de [variable] es poco probable; null si es creíble.
+String? valorPocoProbable(String variable, Object valor) {
+  bool fuera(String k, num v) { final r = rangosCreibles[k]; return r != null && (v < r.$1 || v > r.$2); }
+  if (variable == 'presion' && valor is List && valor.length == 2) {
+    final a = valor[0] as num, b = valor[1] as num;
+    if (fuera('sistolica', a)) return tr('¿Tu presión de arriba es {n}?', {'n': a});
+    if (fuera('diastolica', b)) return tr('¿Tu presión de abajo es {n}?', {'n': b});
+    return null;
+  }
+  if (valor is num && fuera(variable, valor)) {
+    return tr('¿Tu {v} es {n} {u}?', {'v': tr(nombreVariable(variable)).toLowerCase(), 'n': valor, 'u': unidades[variable] ?? ''}).replaceAll(' ?', '?');
+  }
+  return null;
+}
 
 /// Escala de síntomas de la API: 0 = no … 4 = muy fuerte.
 const _escala = ['No', 'Leve', 'Moderado', 'Fuerte', 'Muy fuerte'];
@@ -98,9 +119,16 @@ class _RegState extends ConsumerState<RegistrarScreen> {
       Expanded(child: QuestionStep(index: i, total: qs.length, questionKey: '${q['message_key']}', respaldo: q['respaldo'], last: ultima,
         input: _entrada(c, q),
         onPrev: i > 0 && !busy ? () { setState(() { i--; _cargar(qs[i]); err = null; }); } : null,
-        onNext: busy ? null : () {
+        onNext: busy ? null : () async {
           final e = _guardarRespuesta(q);
           if (e != null) { setState(() => err = e); return; }
+          final v = '${q['variable']}'; final duda = q['tipo'] == 'sintoma' ? null : valorPocoProbable(v, resp[v]!);
+          if (duda != null) {
+            final ok = await ConfirmationDialog.show(context, titulo: tr('Revisa el número'),
+                mensaje: '$duda ${tr('Si es correcto, confírmalo; si no, corrígelo.')}', ok: 'Sí, es correcto', cancel: 'Corregir');
+            if (!ok) { resp.remove(v); return; }
+            if (!mounted) return;
+          }
           if (!ultima) { setState(() { i++; _cargar(qs[i]); err = null; }); return; }
           _enviar(qs);
         })),

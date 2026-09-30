@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/almacen_local.dart';
 import '../core/api.dart';
+import '../core/api_modelos.dart' show errorApi;
+import '../core/sync.dart' show clasificarFalla, FallaEnvio;
 import '../core/state.dart';
 import '../core/theme.dart';
 import '../widgets/cards.dart';
@@ -60,20 +63,64 @@ final futureFor = FutureProvider.family<dynamic, String>((ref, key) {
   final a = ref.read(apiProvider); final s = ref.read(sessionProvider)!;
   ref.watch(sessionProvider.select((s) => (s?.userId, s?.patientId))); // se recarga al cambiar de cuenta o de paciente
   final id = _pidFrom(s);
-  return switch (key) { 'plan' => a.plan(id), 'horarios' => a.horarios(id), 'meds' => a.medicamentos(id),
+  Future<dynamic> pedir() => switch (key) { 'plan' => a.plan(id), 'horarios' => a.horarios(id), 'meds' => a.medicamentos(id),
     'qr' => a.qr(id), 'perfil' => s.role == Role.paciente ? a.paciente(id) : a.yo(),
     'alertas' => a.alertas(), 'pacientes' => a.pacientes(), _ => a.yo() };
+  // Lo que la persona necesita sin internet se guarda en el teléfono (el QR y el tablero del equipo no).
+  return const {'plan', 'horarios', 'meds', 'perfil'}.contains(key) ? conCopiaLocal(ref, '$key.$id', pedir) : pedir();
 });
+
+/// Consultas que se mostraron con la copia guardada en el teléfono (clave -> cuándo se guardó).
+final copiasLocalesProvider = StateProvider<Map<String, DateTime>>((ref) {
+  ref.watch(sessionProvider.select((s) => s?.userId)); return {}; });
+
+/// Pide a la API y guarda la respuesta en el teléfono (por cuenta). Sin red o con el servidor caído,
+/// devuelve la última copia guardada y la marca en [copiasLocalesProvider] para avisar en pantalla.
+Future<dynamic> conCopiaLocal(Ref ref, String clave, Future<dynamic> Function() pedir) async {
+  final u = ref.read(sessionProvider)?.userId;
+  final k = u == null ? null : claveDeUsuario(u, 'copia.$clave');
+  void marcar(DateTime? en) => ref.read(copiasLocalesProvider.notifier).update((m) => en == null ? ({...m}..remove(clave)) : {...m, clave: en});
+  try {
+    final r = await pedir();
+    if (k != null) almacen.guardar(k, {'en': DateTime.now().toIso8601String(), 'datos': r});
+    marcar(null);
+    return r;
+  } catch (e) {
+    final sinServidor = clasificarFalla(e) == FallaEnvio.reintentar && errorApi(e)?.estado != 401 && errorApi(e)?.estado != 429;
+    if (k == null || !sinServidor) rethrow;
+    final c = await almacen.leer(k);
+    if (c is! Map || !c.containsKey('datos')) rethrow;
+    marcar(DateTime.tryParse('${c['en']}') ?? DateTime.now());
+    return c['datos'];
+  }
+}
+
+/// Aviso "Sin conexión: esto es lo último guardado" cuando [clave] vino de la copia del teléfono.
+class AvisoCopiaLocal extends ConsumerWidget { final String clave; const AvisoCopiaLocal(this.clave, {super.key});
+  @override
+  Widget build(BuildContext c, WidgetRef ref) {
+    final en = ref.watch(copiasLocalesProvider.select((m) => m[clave]));
+    if (en == null) return const SizedBox.shrink();
+    final hora = '${en.hour.toString().padLeft(2, '0')}:${en.minute.toString().padLeft(2, '0')}';
+    return Semantics(liveRegion: true, child: Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: C.warning.withValues(alpha: .14), borderRadius: BorderRadius.circular(12)),
+      child: Row(children: [const Icon(Icons.cloud_off, color: C.warning), const SizedBox(width: 12),
+        Expanded(child: Text(tr('Sin conexión. Mostramos lo último guardado ({fecha} {hora}).', {'fecha': fmtFecha(en), 'hora': hora})))])));
+  }
+}
+/// Clave de [AvisoCopiaLocal] para una consulta de [futureFor] del paciente activo.
+String claveCopia(WidgetRef ref, String key) => '$key.${pid(ref)}';
 
 /// Historial de mediciones (180 días) de un paciente. Lo usan el propio paciente, su cuidador y el médico.
 final historialProvider = FutureProvider.family<dynamic, String>((ref, id) {
   ref.watch(sessionProvider.select((s) => s?.userId)); // otra cuenta no ve lo que cargó la anterior
-  return ref.read(apiProvider).registros(id, dias: 180);
+  return conCopiaLocal(ref, 'historial.$id', () => ref.read(apiProvider).registros(id, dias: 180));
 });
 
 /// Programas de cuidado: clave (dato) -> nombre en el idioma actual.
 Map<String, String> get programasCuidado =>
-    {'embarazo': tr('Embarazo y puerperio'), 'cronico': tr('Crónico-degenerativas'), 'adulto_mayor': tr('Adulto mayor')};
+    {'embarazo': tr('Embarazo y puerperio'), 'cronico': tr('Crónico-degenerativas'), 'adulto_mayor': tr('Adulto mayor'),
+      'oncologia': tr('Oncología')}; // clave "oncologia" por confirmar con backend (CONEXION_BACKEND.md, supuesto 3)
 const tiposSangre = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'No sé'];
 
 /// Lista acotada: fármacos que causan alergia con más frecuencia. Si no está, el usuario elige "Otro medicamento…".

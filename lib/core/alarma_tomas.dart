@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../screens/shared.dart';
+import 'almacen_local.dart';
 import 'reminders.dart';
 import 'state.dart';
 
@@ -14,23 +15,40 @@ import 'state.dart';
 /// Textos de cada estado (en español; se traducen con tr() al mostrarlos).
 const etiquetasEstado = {'pendiente': 'Pendiente', 'tomada': 'Tomada', 'omitida': 'Omitida', 'pospuesta': 'Pospuesta'};
 
-/// Respuesta dada en este teléfono hoy (la API demo no guarda el estado de las tomas).
+/// Respuesta dada en este teléfono hoy (la API solo guarda tomada|omitida; "Más tarde" es local).
 class EstadoLocal {
   final String estado; final DateTime? hasta; final String dia;
-  EstadoLocal(this.estado, {this.hasta}) : dia = _hoy(DateTime.now());
+  EstadoLocal(this.estado, {this.hasta, String? dia}) : dia = dia ?? _hoy(DateTime.now());
+  Map<String, dynamic> toJson() => {'estado': estado, 'dia': dia, if (hasta != null) 'hasta': hasta!.toIso8601String()};
+  static EstadoLocal? fromJson(Object? j) => j is Map && j['estado'] is String && j['dia'] is String
+      ? EstadoLocal('${j['estado']}', dia: '${j['dia']}', hasta: DateTime.tryParse('${j['hasta'] ?? ''}')) : null;
 }
 String _hoy(DateTime d) => '${d.year}-${d.month}-${d.day}';
 
+/// Se guarda en el teléfono por cuenta (almacen_local.dart): al reabrir la app, una toma pospuesta
+/// sigue pospuesta y la alarma interna no vuelve a sonar. Solo se conservan las respuestas de hoy.
 class TomasLocales extends StateNotifier<Map<String, EstadoLocal>> {
-  TomasLocales() : super({});
-  void tomada(Object? id) => state = {...state, '$id': EstadoLocal('tomada')};
-  void omitida(Object? id) => state = {...state, '$id': EstadoLocal('omitida')};
-  void pospuesta(Object? id, Duration en) => state = {...state, '$id': EstadoLocal('pospuesta', hasta: DateTime.now().add(en))};
+  TomasLocales([this.usuario]) : super({}) { _cargar(); }
+  final String? usuario;
+  String? get _clave => usuario == null ? null : claveDeUsuario(usuario!, 'tomas');
+
+  Future<void> _cargar() async {
+    final k = _clave; if (k == null) return;
+    final j = await almacen.leer(k); if (j is! Map || !mounted) return;
+    final hoy = _hoy(DateTime.now());
+    final guardadas = {for (final e in j.entries) if (EstadoLocal.fromJson(e.value) case final l? when l.dia == hoy) '${e.key}': l};
+    state = {...guardadas, ...state}; // lo respondido mientras cargaba gana
+  }
+  void _poner(Object? id, EstadoLocal l) {
+    state = {...state, '$id': l};
+    final k = _clave; if (k != null) almacen.guardar(k, {for (final e in state.entries) e.key: e.value.toJson()});
+  }
+  void tomada(Object? id) => _poner(id, EstadoLocal('tomada'));
+  void omitida(Object? id) => _poner(id, EstadoLocal('omitida'));
+  void pospuesta(Object? id, Duration en) => _poner(id, EstadoLocal('pospuesta', hasta: DateTime.now().add(en)));
 }
-final tomasLocalesProvider = StateNotifierProvider<TomasLocales, Map<String, EstadoLocal>>((ref) {
-  ref.watch(sessionProvider.select((s) => s?.userId)); // se reinicia al cambiar de cuenta
-  return TomasLocales();
-});
+final tomasLocalesProvider = StateNotifierProvider<TomasLocales, Map<String, EstadoLocal>>((ref) =>
+    TomasLocales(ref.watch(sessionProvider.select((s) => s?.userId)))); // se reinicia al cambiar de cuenta
 
 /// Horarios con el estado respondido hoy en este teléfono encima del de la API.
 List<Map> conEstadoLocal(List horarios, Map<String, EstadoLocal> locales, [DateTime? ahora]) {

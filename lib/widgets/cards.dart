@@ -30,7 +30,7 @@ class NotificationCard extends ConsumerWidget {
     final tipo = switch (n['tipo']) { 'alerta' => tr('Alerta'), 'omitida' => tr('Toma omitida'), _ => tr('Recordatorio') };
     final detalle = n['key'] != null ? cat('${n['key']}').text : '${n['detalle'] ?? ''}';
     final w = leida ? FontWeight.w400 : FontWeight.w700;
-    return Semantics(button: true, excludeSemantics: true, label: '${leida ? '' : tr('Sin leer. ')}$tipo. ${n['titulo']}. $detalle',
+    return Semantics(button: true, excludeSemantics: true, enabled: true, onTap: onTap, label: '${leida ? '' : tr('Sin leer. ')}$tipo. ${n['titulo']}. $detalle',
       child: InkWell(borderRadius: BorderRadius.circular(16), onTap: onTap, child: InfoCard(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(icon, color: C.primary), const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

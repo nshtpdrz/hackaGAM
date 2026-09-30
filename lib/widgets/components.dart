@@ -26,7 +26,9 @@ class BigButton extends StatelessWidget {
   Widget build(BuildContext c) {
     final child = Row(mainAxisSize: MainAxisSize.min, children: [
       if (icon != null) ...[Icon(icon), SizedBox(width: 8)], Flexible(child: Text(tr(label)))]);
-    return Semantics(button: true, label: label, excludeSemantics: true, child: SizedBox(width: double.infinity,
+    // El lector de pantalla lee un solo botón con su texto traducido, dice si está desactivado y lo activa con doble toque.
+    return Semantics(button: true, label: tr(label), enabled: onTap != null, onTap: onTap, excludeSemantics: true,
+      child: SizedBox(width: double.infinity,
       child: secondary ? OutlinedButton(onPressed: onTap, child: child)
           : FilledButton(style: color == null ? null : FilledButton.styleFrom(backgroundColor: color),
               onPressed: onTap, child: child)));
@@ -63,7 +65,7 @@ class ListenButton extends ConsumerWidget {
     final m = ref.read(catalogProvider).get(lang, k, respaldo: respaldo);
     // Sin audio grabado, la voz del teléfono solo se usa en español o inglés (no sabe leer otomí).
     if (m.audioUrl == null && lang == 'ote' && !m.interprete) return const SizedBox.shrink();
-    return Semantics(button: true, label: ref.watch(trProvider)('listen').text, excludeSemantics: true,
+    return Semantics(button: true, label: ref.watch(trProvider)('listen').text, enabled: true, onTap: () => speak(m, lang), excludeSemantics: true,
       child: IconButton(constraints: BoxConstraints(minWidth: 48, minHeight: 48),
         style: IconButton.styleFrom(backgroundColor: C.p100), color: C.primary,
         icon: Icon(Icons.volume_up_rounded), onPressed: () => speak(m, lang)));

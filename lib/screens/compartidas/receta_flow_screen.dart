@@ -227,8 +227,21 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
       _ => const SizedBox.shrink() };
   }
 
+  /// Atrás (sistema o flecha): en revisar/horarios/confirmar regresa un paso; con una lectura en curso o ya
+  /// hecha pregunta antes de salir para no perder lo revisado. En el primer y último paso sale normal.
+  Future<void> _atras() async {
+    if (paso >= 3 && paso <= 5) { setState(() { paso--; err = null; }); return; }
+    final salir = await ConfirmationDialog.show(context, titulo: '¿Salir de la receta?',
+        mensaje: 'Se perderá lo que ya se leyó y revisaste.', ok: 'Salir', cancel: 'Seguir aquí');
+    if (salir && mounted) Navigator.of(context).pop();
+  }
+
   @override
-  Widget build(BuildContext c) => Scaffold(
+  Widget build(BuildContext c) => PopScope(canPop: paso == 0 || paso == 6,
+    onPopInvokedWithResult: (hecho, _) { if (!hecho) _atras(); },
+    child: _pantalla(c));
+
+  Widget _pantalla(BuildContext c) => Scaffold(
     appBar: AppBar(title: Text(tr(titulos[paso])), backgroundColor: C.bg),
     body: SafeArea(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Semantics(label: tr('Paso {n} de {t}', {'n': paso + 1, 't': 7}), child: LinearProgressIndicator(value: (paso + 1) / 7, minHeight: 10)),

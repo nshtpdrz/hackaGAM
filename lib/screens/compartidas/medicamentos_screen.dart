@@ -40,6 +40,7 @@ class MedicamentosScreen extends ConsumerWidget { const MedicamentosScreen({supe
     ref.watch(sessionProvider.select((s) => s?.patientId));
     return page(c, tr('Mis medicamentos'), AsyncView(ref.watch(futureFor('meds')),
       (d) => ListView(padding: EdgeInsets.fromLTRB(16, 16, 16, 40 + 72 * escalaDe(c)), children: [
+        AvisoCopiaLocal(claveCopia(ref, 'meds')),
         TarjetaAdherencia(pacienteId: pid(ref)), const SizedBox(height: 12),
         for (final m in (d as List)) Padding(padding: const EdgeInsets.only(bottom: 12), child: InfoCard(child: Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

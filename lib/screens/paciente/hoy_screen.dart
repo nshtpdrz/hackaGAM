@@ -14,10 +14,14 @@ class HoyScreen extends ConsumerWidget { const HoyScreen({super.key});
     // Cada vez que se cargan los horarios se (re)programan las alarmas diarias de las tomas.
     ref.listen(futureFor('horarios'), (_, n) => n.whenData((d) { if (d is List) programarAlarmasTomas(d); }));
     final locales = ref.watch(tomasLocalesProvider);
-    return page(c, tr('Hoy'), AsyncView(ref.watch(futureFor('horarios')),
+    // Se envuelve la lista para que, sin tomas hoy, se sigan viendo "Mostrar mi código QR" y "Heridas".
+    return page(c, tr('Hoy'), AsyncView(ref.watch(futureFor('horarios')).whenData((d) => {'horarios': d}),
       (d) => ListView(padding: const EdgeInsets.all(16), children: [
+        AvisoCopiaLocal(claveCopia(ref, 'horarios')),
         Text(tr('Próximas tomas'), style: Theme.of(c).textTheme.headlineSmall), const SizedBox(height: 8),
-        for (final h in conEstadoLocal(d as List, locales)) Padding(padding: const EdgeInsets.only(bottom: 12), child: InfoCard(
+        if ((d['horarios'] as List).isEmpty) Padding(padding: const EdgeInsets.only(bottom: 16),
+          child: Text(tr('Hoy no tienes tomas de medicamento.'), style: Theme.of(c).textTheme.bodyLarge)),
+        for (final h in conEstadoLocal(d['horarios'] as List, locales)) Padding(padding: const EdgeInsets.only(bottom: 12), child: InfoCard(
           child: ListTile(contentPadding: EdgeInsets.zero, minVerticalPadding: 12,
             title: Text(tr('{hora} · {med}', {'hora': h['hora'], 'med': h['medicamento']})),
             subtitle: Text(tr('{dosis} · {estado}', {'dosis': h['dosis'], 'estado': tr(etiquetasEstado['${h['estado']}'] ?? '${h['estado']}')})),

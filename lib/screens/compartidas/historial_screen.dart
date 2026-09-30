@@ -76,7 +76,7 @@ class _HistorialState extends ConsumerState<HistorialContenido> {
     ref.watch(sessionProvider.select((s) => s?.patientId)); // cuidador: cambia al elegir otro familiar
     final id = widget.pacienteId ?? pid(ref);
     Widget lista(List<Widget> hijos) => RefreshIndicator(onRefresh: () => ref.refresh(historialProvider(id).future),
-      child: ListView(padding: const EdgeInsets.all(16), children: [...widget.encabezado, ...hijos]));
+      child: ListView(padding: const EdgeInsets.all(16), children: [...widget.encabezado, AvisoCopiaLocal('historial.$id'), ...hijos]));
     return ref.watch(historialProvider(id)).when(
       loading: () => lista([Semantics(label: tr('Cargando'), child: const Padding(padding: EdgeInsets.all(32),
         child: Center(child: CircularProgressIndicator())))]),

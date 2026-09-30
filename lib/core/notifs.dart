@@ -1,10 +1,27 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'almacen_local.dart';
 import 'api.dart';
 import 'state.dart';
 import 'tr.dart';
 
 /// Leídas/no leídas (local). Las notificaciones se derivan de /alertas y /pacientes/:id/horarios.
-final leidasProvider = StateProvider<Set<String>>((ref) { ref.watch(sessionProvider.select((s) => s?.userId)); return {}; });
+/// Se guardan en el teléfono por cuenta (las últimas 300) para que al reabrir la app no vuelvan a "Nueva".
+final leidasProvider = StateProvider<Set<String>>((ref) {
+  final u = ref.watch(sessionProvider.select((s) => s?.userId));
+  if (u == null) return {};
+  final k = claveDeUsuario(u, 'leidas'); var cargado = false;
+  almacen.leer(k).then((v) {
+    cargado = true;
+    try {
+      if (v is List && v.isNotEmpty) ref.controller.state = {...v.map((e) => '$e'), ...ref.controller.state};
+    } catch (_) {} // ya se cerró sesión
+  });
+  ref.listenSelf((_, n) {
+    if (!cargado) return; // no se pisa lo guardado antes de leerlo
+    final l = n.toList(); almacen.guardar(k, l.length > 300 ? l.sublist(l.length - 300) : l);
+  });
+  return {};
+});
 
 final notificacionesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final s = ref.watch(sessionProvider); if (s == null) return [];

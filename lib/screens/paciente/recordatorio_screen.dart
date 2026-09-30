@@ -140,7 +140,9 @@ class _RecordatorioState extends ConsumerState<RecordatorioScreen> {
         dato(c, tr('Dosis'), toma['dosis']), dato(c, tr('Horario'), toma['hora']), dato(c, tr('Vía'), tr('${toma['via'] ?? 'oral'}')),
         Row(children: [Icon(_iconos[e], color: C.primary), const SizedBox(width: 8),
           Flexible(child: Text(tr('Estado: {estado}', {'estado': tr(etiquetasEstado[e]!)}), style: tt.labelLarge))])])),
-      if (est == 'omitida') Padding(padding: const EdgeInsets.only(top: 12), child: Text(tr('Pasaron 30 minutos sin respuesta y la toma quedó como omitida.'))),
+      // Solo si nadie respondió en este teléfono: con "No me la tomé" la persona ya sabe que quedó omitida.
+      if (est == 'omitida' && !ref.watch(tomasLocalesProvider).containsKey('${toma['id']}'))
+        Padding(padding: const EdgeInsets.only(top: 12), child: Text(tr('Pasaron 30 minutos sin respuesta y la toma quedó como omitida.'))),
       const SizedBox(height: 24),
       if (abierta) ...[
         BigButton(tr('Ya la tomé'), icon: Icons.check, color: C.success, onTap: _tomada), const SizedBox(height: 12),

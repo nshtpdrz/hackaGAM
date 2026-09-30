@@ -36,15 +36,17 @@ class _AltaState extends ConsumerState<AltaPacienteScreen> {
     if (paso < 3) { setState(() => paso++); return; }
     final firma = await context.push<String>('/consentimiento', extra: true);
     if (firma == null || !mounted) return;
+    // El consentimiento solo se acepta con la versión del aviso cargada: no se inventa una.
+    final version = ref.read(avisoPrivacidadProvider).valueOrNull?['version']?.toString();
+    if (version == null) { setState(() => err = tr('No se pudo cargar el aviso de privacidad. Sin él no se puede continuar.')); return; }
     setState(() => busy = true);
     try {
       final api = ref.read(apiProvider);
-      final aviso = await ref.read(avisoPrivacidadProvider.future).catchError((_) => const <String, dynamic>{});
       // POST /pacientes: perfil + programas + cuidador + consentimiento -> paciente + codigo_qr + credenciales temporales.
       final p = await api.crearPaciente({'nombre': t('nombre').text.trim(), 'fecha_nacimiento': nac!.toIso8601String().substring(0, 10),
         'sexo': sexo, 'tipo_sangre': sangre, 'alergias': t('alergias').text.trim(), 'diagnosticos': t('diagnosticos').text.trim(),
         'programas': programas.toList(), 'cuidador': {'nombre': t('cuidador').text.trim(), 'contacto': t('contacto').text.trim()}},
-        versionAviso: aviso['version']?.toString());
+        versionAviso: version);
       final id = '${p['id']}';
       // La guía solo permite PUT preferencias al paciente y al cuidador: si el equipo no puede, se omite
       // (el paciente las ajusta al entrar).
