@@ -17,7 +17,34 @@ cerrar sesión), biometría con resultado por caso (`lib/core/biometria.dart`) y
 **En edición en otra rama:** `login_screen.dart`, `perfil_screen.dart`, `router.dart`, `traducciones*.dart` y la
 pantalla de diagnóstico. Revisar sus puntos (SE4, SE5, SE6, PL8, A6) al integrar.
 
-## Lo más urgente
+## Estado al cerrar esta ronda
+
+**Resuelto** (detalle en los commits de la rama `senda-pendientes-xif7dt`):
+
+| # | Cómo quedó |
+|---|---|
+| D1, D2, D3 | Cola cifrada en el teléfono (`lib/core/almacen_local.dart`, `sync.dart`), por cuenta. 409 = enviada; red, 401, 408, 429 y 5xx se reintentan (cada 2 min y al volver a primer plano); otro 4xx se aparta en "No se pudieron enviar" con Reintentar/Descartar. |
+| D4, D5, NA4 | Respuestas del día a las tomas, última copia de horarios/medicamentos/plan/perfil/historial (aviso "Sin conexión…") y leídas se guardan por cuenta. |
+| SE1 | "Crear cuenta" envía `POST /auth/registro`; solo con 2xx dice que se creó. 404/405/501: "Por ahora las cuentas las crea tu equipo de salud". |
+| SE2, SE3 | Cerrar sesión cancela alarmas y avisos y borra los datos de la cuenta; todo lo que se cargó en memoria depende de `userId`. Con sesión expirada (401) se conservan. |
+| SE7 | Con huella activa, tras 5 min en segundo plano se pide otra vez (`widgets/bloqueo_al_volver.dart`); no bloquea una alarma sonando. |
+| SE8 | Sin versión del aviso de privacidad no se puede aceptar ni dar de alta (ya no se envía `'1'`). Los textos provisionales siguen hasta tener los oficiales (backend/legal). |
+| A1, A2, PL5 | Preferencias guardadas en el teléfono y aplicadas antes de crear los canales; solo el paciente las envía y recibe de la API. |
+| A3, A4, A8, A10 | Lector de pantalla activa los botones y dice si están desactivados; "Escuchar" legible; confirmación ante valores poco probables; avisos si falta la voz o el audio; pictograma sin red. |
+| A6, T4 | Textos nuevos en `textos_para_traducir.csv/.xlsx`; `test/traduccion_test.dart` falla si un `tr('…')` no tiene inglés. |
+| A9 | Documentado en `theme.dart`: `C.marca` solo identidad, `C.primary` interfaz. |
+| PL1, PL2, PL3, PL4, PL6, PL7, PL9 | Permisos de cámara/fotos con botón a Ajustes (`core/permisos.dart`); foto recuperada si Android cerró la app; permisos de iOS en inglés (`InfoPlist.strings`); alarmas en la zona del teléfono (`flutter_timezone`); sin drift/sqlite; sin `scheduleMedReminders`; brillo al máximo en el QR. |
+| NA1, NA2 | "Pedir ayuda" llama al cuidador (y al 911 en rojo); "Pasaron 30 minutos…" solo si nadie respondió. |
+| PA1–PA7 | Formulario del plan de control; "Ver expediente" oculto; código bajo el QR si es corto; Oncología; Hoy sin tomas conserva sus botones; Atrás en la receta regresa un paso o pregunta; PNG se sube como PNG. |
+| T1, T5 | `test/cola_y_sesion_test.dart` y `test/pendientes_frontend_test.dart`. |
+
+**Queda:**
+
+- En archivos que se editan en otra rama (no se tocaron): SE4, SE5, SE6 (`login_screen.dart`), PL8 (`router.dart`), A7 (`api_modelos.dart`).
+- Necesitan a backend o traductores: A5 (mapa `ote`), NA3 (`fecha_fin`), la omisión automática de NA2, código corto del QR (PA3), textos oficiales y firma del consentimiento (SE8), y confirmar los formatos propuestos abajo.
+- T3: pruebas en dispositivo (`integration_test`) y la lista de `docs/EMPAQUETADO.md`.
+
+## Lo más urgente (lista original)
 
 | # | Pendiente | Dónde |
 |---|---|---|
@@ -117,7 +144,8 @@ Propuestas que salen del código de la app. **No son contratos**: hay que acorda
 
 | Necesidad | Por qué (app) | Propuesta |
 |---|---|---|
-| Crear cuenta | `register_screen.dart:140`, `api.dart:177` | `POST /auth/registro`, o acordar que las cuentas solo las crea el equipo y quitar "Crear cuenta" (SE1). |
+| Crear cuenta | `register_screen.dart` (`_cuerpoRegistro`), `api.dart:177` | `POST /auth/registro` con `{rol: paciente\|cuidador\|medico, nombre, correo, telefono, contrasena, preferencias, …}`; paciente agrega `fecha_nacimiento, sexo, tipo_sangre, alergias, programas`; cuidador `codigo_qr`; médico `cedula, clinica`. 2xx = creada; 409 = correo ya registrado. Si no se hará, responder 404 y la app lo explica (SE1). |
+| Plan de control | `plan_control_screen.dart` (PA1) | `GET/PUT /pacientes/:id/plan` con `rangos: [{variable, activo, frecuencia: diaria\|dos_al_dia\|semanal, min, max, min2?, max2?, meta?}]` (presión: `min/max` sistólica, `min2/max2` diastólica). La app también lee `minimo/maximo/valor_min/valor_max`. |
 | Registro de cuidador por QR | `register_screen.dart:191` | `GET /registro/qr/:codigo` sin sesión, con datos mínimos (nombre corto y cuidador asignado). |
 | Editar perfil y foto | `editar_perfil_screen.dart:29-30`, `avatar_perfil.dart:56-63` | `PATCH /auth/yo`, `PATCH /pacientes/:id`, `POST /auth/yo/foto`. |
 | Baja del dispositivo al cerrar sesión | `push.dart:111-115` solo borra el token en el teléfono; el servidor conserva el viejo hasta que FCM lo invalide. | `DELETE /dispositivos/:token_fcm` (o equivalente) que la app llama antes de borrar el JWT. |

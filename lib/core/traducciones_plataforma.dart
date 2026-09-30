@@ -119,4 +119,13 @@ const Map<String, Map<String, String>> traduccionesPlataforma = {'en': {
   'Se perderá lo que ya se leyó y revisaste.': 'What was read and what you reviewed will be lost.',
   'Salir': 'Leave',
   'Seguir aquí': 'Stay here',
+  // Bloqueo al volver del segundo plano (lib/widgets/bloqueo_al_volver.dart)
+  'SENDA está bloqueada': 'SENDA is locked',
+  'Desbloquear': 'Unlock',
+  'Entrar con contraseña': 'Log in with password',
+  // Voz y audio (components.dart)
+  'No se pudo reproducir el audio. Revisa tu internet.': 'Could not play the audio. Check your internet.',
+  'Instala la voz en inglés en los Ajustes del teléfono para escuchar.': 'Install the English voice in your phone Settings to listen.',
+  'Instala la voz en español en los Ajustes del teléfono para escuchar.': 'Install the Spanish voice in your phone Settings to listen.',
+  'No se pudo leer en voz alta.': 'Could not read aloud.',
 }};

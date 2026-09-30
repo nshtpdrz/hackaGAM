@@ -233,7 +233,7 @@ flutter build appbundle --release --obfuscate --split-debug-info=build/simbolos 
 
 Antes de subir, revisa en Android Studio (pestaña "Merged Manifest" de `AndroidManifest.xml`) que los plugins no
 agreguen permisos inesperados (almacenamiento, `AD_ID`). Si Play Console avisa sobre páginas de memoria de 16 KB,
-revisa qué librería nativa marca (p. ej. `sqlite3_flutter_libs` o ML Kit de `mobile_scanner`) y sube la versión de
+revisa qué librería nativa marca (p. ej. ML Kit de `mobile_scanner`) y sube la versión de
 ese plugin.
 
 ## Permisos

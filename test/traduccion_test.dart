@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medmap/core/tr.dart';
+import 'package:medmap/core/traducciones.dart';
+import 'package:medmap/core/traducciones_extra.dart';
+import 'package:medmap/core/traducciones_plataforma.dart';
 import 'package:medmap/screens/compartidas/historial_screen.dart';
 import 'package:medmap/screens/shared.dart';
 
@@ -10,6 +14,7 @@ class _Titulo extends StatelessWidget { const _Titulo();
 
 void main() {
   tearDown(() => fijarIdioma('es'));
+  _todoTraducido();
 
   test('tr: traduce, reemplaza variables y cae a español si falta', () {
     fijarIdioma('en');
@@ -43,5 +48,23 @@ void main() {
       expect(find.text(s), findsWidgets, reason: s);
     }
     expect(find.textContaining('compared with the previous week'), findsOneWidget);
+  });
+}
+
+/// T4: todo texto literal en tr('…') dentro de lib/ tiene traducción al inglés en traducciones*.dart.
+/// (Los textos con variables {x} cuentan; los que se arman con $ no se pueden revisar así.)
+void _todoTraducido() {
+  test('todo tr(\'…\') de lib/ tiene inglés', () {
+    final en = {...traducciones['en']!, ...traduccionesExtra['en']!, ...traduccionesPlataforma['en']!};
+    final re = RegExp(r"""\btr\(\s*'((?:[^'\\]|\\.)*)'""");
+    final faltan = <String>[];
+    for (final f in Directory('lib').listSync(recursive: true).whereType<File>()) {
+      if (!f.path.endsWith('.dart') || f.path.contains('traducciones')) continue;
+      for (final m in re.allMatches(f.readAsStringSync())) {
+        final k = m.group(1)!.replaceAll(r"\'", "'");
+        if (!k.contains(r'$') && !en.containsKey(k)) faltan.add('${f.path}: $k');
+      }
+    }
+    expect(faltan, isEmpty, reason: 'Agrega estos textos a lib/core/traducciones_plataforma.dart');
   });
 }

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Dos morados, a propósito (A9):
+/// - [C.marca] #593286: solo identidad SENDA (arranque, logotipo, ícono, notificaciones, pantalla de bloqueo).
+///   Debe coincidir con assets/marca, web/index.html, reminders.dart y adaptive_icon_background del pubspec.
+/// - [C.primary] #5F447B: interfaz (botones, enlaces, selección). Un poco más claro para que los estados
+///   presionado/desactivado y el alto contraste se distingan; no usarlo en elementos de marca.
 class C {
   static const primary = Color(0xFF5F447B), p600 = Color(0xFF9274AF), p300 = Color(0xFFC8A8E6),
       p100 = Color(0xFFE4D3F3), bg = Color(0xFFF8F7FA), surface = Colors.white,

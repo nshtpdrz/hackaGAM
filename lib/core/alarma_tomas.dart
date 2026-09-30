@@ -123,7 +123,10 @@ class _VigilanteState extends ConsumerState<VigilanteTomas> with WidgetsBindingO
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState s) { _ciclo = s; if (s == AppLifecycleState.resumed) _revisar(); }
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    _ciclo = s;
+    if (s == AppLifecycleState.resumed) revisarZonaHoraria().whenComplete(_revisar); // viaje o cambio de horario
+  }
 
   void _alCambiarSesion() {
     _timer?.cancel(); _timer = null;

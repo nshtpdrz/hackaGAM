@@ -12,11 +12,30 @@ import '../core/escala_texto.dart';
 final _tts = FlutterTts();
 final _player = AudioPlayer();
 
-/// Audio: URL del catálogo (Hñähñu) o TTS (es/en).
-Future<void> speak(Msg m, String lang) async {
-  if (m.audioUrl != null) { await _player.play(UrlSource(m.audioUrl!)); return; }
-  await _tts.setLanguage(lang == 'en' ? 'en-US' : 'es-MX');
-  await _tts.speak(m.text);
+/// Audio: URL del catálogo (Hñähñu) o TTS (es/en). Devuelve un aviso (traducido) si no se pudo reproducir.
+Future<String?> speak(Msg m, String lang) async {
+  if (m.audioUrl != null) {
+    try { await _player.play(UrlSource(m.audioUrl!)); return null; }
+    catch (_) { return tr('No se pudo reproducir el audio. Revisa tu internet.'); } // sin red cae a la voz del teléfono
+  }
+  final idioma = lang == 'en' ? 'en-US' : 'es-MX';
+  try {
+    // Sin la voz del idioma instalada el teléfono no dice nada: se avisa cómo instalarla.
+    final hay = await _tts.isLanguageAvailable(idioma);
+    if (hay == false) {
+      return lang == 'en' ? tr('Instala la voz en inglés en los Ajustes del teléfono para escuchar.')
+          : tr('Instala la voz en español en los Ajustes del teléfono para escuchar.');
+    }
+    await _tts.setLanguage(idioma);
+    await _tts.speak(m.text);
+    return null;
+  } catch (_) { return tr('No se pudo leer en voz alta.'); }
+}
+
+/// [speak] y, si falla, lo dice en pantalla.
+Future<void> hablar(BuildContext c, Msg m, String lang) async {
+  final aviso = await speak(m, lang);
+  if (aviso != null && c.mounted) ScaffoldMessenger.maybeOf(c)?.showSnackBar(SnackBar(content: Text(aviso)));
 }
 
 class BigButton extends StatelessWidget {
@@ -46,7 +65,8 @@ class MsgText extends ConsumerWidget {
     final m = ref.read(catalogProvider).get(p.lang, k, respaldo: respaldo);
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (p.pictograms && m.pictogram != null) Padding(padding: const EdgeInsets.only(right: 12),
-          child: Image.network(m.pictogram!, width: 48, height: 48, semanticLabel: m.text)),
+          child: Image.network(m.pictogram!, width: 48, height: 48, semanticLabel: m.text,
+            errorBuilder: (_, __, ___) => const SizedBox(width: 48, height: 48, child: Icon(Icons.image_not_supported_outlined, color: C.text2)))),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(m.text, style: style ?? Theme.of(c).textTheme.bodyLarge),
         // La frase aún no está validada en esta lengua: se muestra en español y se avisa.
@@ -65,10 +85,10 @@ class ListenButton extends ConsumerWidget {
     final m = ref.read(catalogProvider).get(lang, k, respaldo: respaldo);
     // Sin audio grabado, la voz del teléfono solo se usa en español o inglés (no sabe leer otomí).
     if (m.audioUrl == null && lang == 'ote' && !m.interprete) return const SizedBox.shrink();
-    return Semantics(button: true, label: ref.watch(trProvider)('listen').text, enabled: true, onTap: () => speak(m, lang), excludeSemantics: true,
+    return Semantics(button: true, label: ref.watch(trProvider)('listen').text, enabled: true, onTap: () => hablar(c, m, lang), excludeSemantics: true,
       child: IconButton(constraints: BoxConstraints(minWidth: 48, minHeight: 48),
         style: IconButton.styleFrom(backgroundColor: C.p100), color: C.primary,
-        icon: Icon(Icons.volume_up_rounded), onPressed: () => speak(m, lang)));
+        icon: Icon(Icons.volume_up_rounded), onPressed: () => hablar(c, m, lang)));
   }
 }
 

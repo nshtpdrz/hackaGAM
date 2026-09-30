@@ -4,6 +4,7 @@ import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart' show TimeOfDay;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'tr.dart';
@@ -71,6 +72,7 @@ Future<void> initReminders() async {
   if (kIsWeb) return;
   try {
     tzdata.initializeTimeZones();
+    await _usarZonaDelTelefono();
     await _plugin.initialize(InitializationSettings(
         android: const AndroidInitializationSettings(_icono),
         // El permiso se pide después de iniciar sesión (pedirPermisoNotificaciones), no al abrir la app.
@@ -91,6 +93,19 @@ Future<void> initReminders() async {
       if (pushLocalDeArranque == null) { tomaDeArranque = t; accionDeArranque = r?.actionId; }
     }
   } catch (_) {}
+}
+
+/// Las alarmas diarias se programan en la zona del teléfono: "8:00" sigue siendo 8:00 con horario de verano
+/// o de viaje. Si no se puede saber la zona, se queda en UTC (la hora se corre una hora al cambiar el horario).
+Future<void> _usarZonaDelTelefono() async {
+  try { tz.setLocalLocation(tz.getLocation(await FlutterTimezone.getLocalTimezone())); } catch (_) {}
+}
+
+/// La zona del teléfono cambió (la app vuelve a primer plano): se reprograman las alarmas en la nueva.
+Future<void> revisarZonaHoraria() async {
+  if (kIsWeb || !_iniciado) return;
+  final antes = tz.local.name; await _usarZonaDelTelefono();
+  if (tz.local.name != antes) _firma = '';
 }
 
 Future<void> _crearCanalAlertas() async {
@@ -206,7 +221,7 @@ Future<void> _agendar(int id, Map toma, DateTime cuando, {required bool diaria})
   final payload = jsonEncode(toma.map((k, v) => MapEntry('$k', v)));
   for (final modo in [AndroidScheduleMode.exactAllowWhileIdle, AndroidScheduleMode.inexactAllowWhileIdle]) {
     try {
-      await _plugin.zonedSchedule(id, _titulo(toma), _cuerpo(toma), tz.TZDateTime.from(cuando, tz.UTC), _detallesAlarma(),
+      await _plugin.zonedSchedule(id, _titulo(toma), _cuerpo(toma), tz.TZDateTime.from(cuando, tz.local), _detallesAlarma(),
         androidScheduleMode: modo, payload: payload,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: diaria ? DateTimeComponents.time : null);

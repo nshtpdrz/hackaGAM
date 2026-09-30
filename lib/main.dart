@@ -10,6 +10,7 @@ import 'core/sync.dart';
 import 'core/theme.dart';
 import 'core/tr.dart';
 import 'core/escala_texto.dart';
+import 'widgets/bloqueo_al_volver.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,6 +60,7 @@ class MedmapApp extends ConsumerWidget {
           child: ReceptorPush(
             abrir: (ruta, {extra, pestana = false}) => pestana ? router.go(ruta) : router.push(ruta, extra: extra),
             listo: listo,
-            child: child!))));
+            // Con huella activa, al volver después de 5 min en segundo plano se pide otra vez.
+            child: BloqueoAlVolver(child: child!)))));
   }
 }

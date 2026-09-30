@@ -40,7 +40,12 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
     if (f == null) return;
     _usar(await f.readAsBytes()); // bytes: funciona igual en teléfono y en web
   }
-  void _usar(Uint8List b) { if (mounted) setState(() { foto = b; fotoNombre = 'receta.jpg'; err = null; }); }
+  /// El nombre decide el tipo que se sube (api.dart): PNG si los bytes lo son; si no, JPEG (image_picker
+  /// ya convierte HEIC a JPEG al comprimir con imageQuality).
+  void _usar(Uint8List b) {
+    final png = b.length > 4 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47;
+    if (mounted) setState(() { foto = b; fotoNombre = png ? 'receta.png' : 'receta.jpg'; err = null; });
+  }
   bool get _listo => foto != null || (escribir && _texto.text.trim().isNotEmpty);
   Future<void> _procesar() async {
     setState(() { paso = 1; err = null; });

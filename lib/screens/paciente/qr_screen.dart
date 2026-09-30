@@ -1,14 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import '../../widgets/components.dart';
 import '../shared.dart';
 import '../../core/tr.dart';
 
 // 8. QR
-class QrScreen extends ConsumerWidget { const QrScreen({super.key});
+class QrScreen extends ConsumerStatefulWidget { const QrScreen({super.key});
+  @override ConsumerState<QrScreen> createState() => _QrState(); }
+
+class _QrState extends ConsumerState<QrScreen> {
+  // Brillo al máximo mientras se ve el QR: con la pantalla oscura el lector del equipo puede fallar.
   @override
-  Widget build(BuildContext c, WidgetRef ref) => page(c, tr('Mi código QR'), AsyncView(ref.watch(futureFor('qr')),
+  void initState() { super.initState(); ScreenBrightness.instance.setApplicationScreenBrightness(1).catchError((_) {}); }
+  @override
+  void dispose() { ScreenBrightness.instance.resetApplicationScreenBrightness().catchError((_) {}); super.dispose(); }
+
+  @override
+  Widget build(BuildContext c) => page(c, tr('Mi código QR'), AsyncView(ref.watch(futureFor('qr')),
     (d) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
       Semantics(label: tr('Código QR de identificación'), child: QrImageView(data: d['token'], size: 260, backgroundColor: Colors.white)),
       // Respaldo si el lector no lee el QR: el equipo lo escribe en "Escribir código". Solo si es corto
