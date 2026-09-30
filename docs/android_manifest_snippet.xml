@@ -1,0 +1,47 @@
+<!-- android/app/src/main/AndroidManifest.xml -->
+<!-- Dentro de <manifest>, antes de <application>: -->
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.CAMERA"/>
+<uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+<uses-permission android:name="android.permission.VIBRATE"/>
+<!-- Alarma de tomas (canal "alarma_tomas"): pantalla completa sobre la pantalla bloqueada. -->
+<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+<uses-permission android:name="android.permission.WAKE_LOCK"/>
+<!-- Alarmas exactas: en Android 12-13 basta SCHEDULE_EXACT_ALARM; en Android 14+ viene negado por defecto
+     y el usuario lo activa en Ajustes > Apps > MEDMAP > Alarmas y recordatorios
+     (la app puede abrir esa pantalla con requestExactAlarmsPermission()). Sin permiso, la app programa
+     alarmas inexactas (pueden retrasarse unos minutos en ahorro de batería).
+     Alternativa para apps de recordatorio de medicamentos: USE_EXACT_ALARM (concedido automáticamente,
+     pero Google Play lo revisa; usar solo uno de los dos). -->
+<!-- <uses-permission android:name="android.permission.USE_EXACT_ALARM"/> -->
+
+<!-- En <application>: OBLIGATORIO para la demo con la API por http (Guía de conexión del frontend §1).
+     Android 9+ bloquea HTTP sin cifrar incluso a localhost:
+     <application android:usesCleartextTraffic="true" ...>
+     Con el Redmi por USB: adb reverse tcp:3000 tcp:3000 y flutter run --dart-define=API_URL=http://localhost:3000/api/v1
+     Si no conecta, abre http://localhost:3000/api/v1/salud en Chrome del teléfono: si carga, el problema es el
+     manifest o la URL; si no carga, falta adb reverse o la API no está corriendo. -->
+<!-- android:usesCleartextTraffic="true" -->
+
+<!-- Dentro de <application>, para reprogramar recordatorios tras reiniciar: -->
+<receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
+<receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+  <intent-filter>
+    <action android:name="android.intent.action.BOOT_COMPLETED"/>
+    <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+  </intent-filter>
+</receiver>
+
+<!-- Botones "Ya la tomé" / "Más tarde" de la notificación: -->
+<receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"/>
+
+<!-- En la <activity android:name=".MainActivity">, para que la alarma encienda la pantalla y se vea bloqueado: -->
+<!-- android:showWhenLocked="true"
+     android:turnScreenOn="true" -->
+
+<!-- local_auth exige que MainActivity extienda FlutterFragmentActivity:
+     class MainActivity : FlutterFragmentActivity() -->
+<!-- minSdkVersion 23 o superior (android/app/build.gradle) -->

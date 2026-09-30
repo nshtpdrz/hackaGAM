@@ -1,0 +1,17 @@
+<!-- ios/Runner/Info.plist, dentro de <dict>: -->
+<key>NSCameraUsageDescription</key>
+<string>Se usa la cámara para escanear códigos QR, fotografiar recetas o cajas de medicamentos y tomar tu foto de perfil.</string>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>Se usa la galería para elegir la foto de una receta, de una caja de medicamento o tu foto de perfil.</string>
+<key>NSFaceIDUsageDescription</key>
+<string>Se usa Face ID para entrar de forma rápida y segura.</string>
+<key>UIBackgroundModes</key>
+<array><string>remote-notification</string></array>
+<!-- iOS mínimo recomendado: 13.0 (ios/Podfile: platform :ios, '13.0') -->
+<!-- Alarma de tomas: las notificaciones usan interruptionLevel timeSensitive (suenan aunque haya "Concentración").
+     En Xcode: Signing & Capabilities > + Time Sensitive Notifications
+     (entitlement com.apple.developer.usernotifications.time-sensitive = true).
+     Los botones "Ya la tomé" / "Más tarde" se registran como categoría "toma" en initReminders().
+     En ios/Runner/AppDelegate.swift, para que funcionen las acciones en segundo plano:
+       FlutterLocalNotificationsPlugin.setPluginRegistrantCallback { registry in GeneratedPluginRegistrant.register(with: registry) }
+       UNUserNotificationCenter.current().delegate = self as UNUserNotificationCenterDelegate -->
