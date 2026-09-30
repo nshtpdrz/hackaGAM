@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -18,21 +18,45 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SENDA: seguimiento de pacientes entre consultas.">
+  <meta name="theme-color" content="#593286">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="medmap">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SENDA">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>medmap</title>
+  <title>SENDA</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Pantalla de arranque mientras carga Flutter (la app muestra después la suya, con el mismo diseño). -->
+  <style>
+    html, body { margin: 0; height: 100%; background: #593286; }
+    #arranque { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 28px; background: #593286; transition: opacity .3s ease; z-index: 10; }
+    #arranque .emblema { width: min(45vw, 220px); height: auto; }
+    #arranque .logo { width: min(60vw, 280px); height: auto; }
+    @media (prefers-reduced-motion: reduce) { #arranque { transition: none; } }
+  </style>
 </head>
 <body>
+  <div id="arranque" role="img" aria-label="SENDA">
+    <img class="emblema" src="splash/emblema.png" alt="">
+    <img class="logo" src="splash/logo.png" alt="">
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var a = document.getElementById('arranque');
+      if (!a) return;
+      a.style.opacity = '0';
+      setTimeout(function () { a.remove(); }, 300);
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

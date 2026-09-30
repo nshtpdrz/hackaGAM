@@ -59,7 +59,7 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            Text(tr('Registro en MEDMAP'), style: Theme.of(c).textTheme.headlineMedium?.copyWith(color: C.primary)),
+            Text(tr('Registro en SENDA'), style: Theme.of(c).textTheme.headlineMedium?.copyWith(color: C.primary)),
             const SizedBox(height: 8),
             Text(tr('Selecciona tu tipo de usuario para configurar tu cuenta.')),
             const SizedBox(height: 24),

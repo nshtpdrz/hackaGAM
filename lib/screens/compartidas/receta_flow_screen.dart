@@ -28,10 +28,11 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
   void dispose() { _texto.dispose(); super.dispose(); }
 
   Future<void> _foto(ImageSource s) async {
-    final f = await ImagePicker().pickImage(source: s, maxWidth: 2400, imageQuality: 85);
+    // Guía: JPEG con calidad 85 y máximo 2000 px (evita HEIC, que la IA no acepta, y baja tiempo y costo).
+    final f = await ImagePicker().pickImage(source: s, maxWidth: 2000, imageQuality: 85);
     if (f == null) return;
     final b = await f.readAsBytes(); // bytes: funciona igual en teléfono y en web
-    setState(() { foto = b; fotoNombre = f.name; err = null; });
+    setState(() { foto = b; fotoNombre = 'receta.jpg'; err = null; });
   }
   bool get _listo => foto != null || (escribir && _texto.text.trim().isNotEmpty);
   Future<void> _procesar() async {
@@ -74,9 +75,58 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
       try { await programarAlarmasTomas(await ref.read(futureFor('horarios').future) as List); } catch (_) { rec = false; }
       if (mounted) setState(() { recordatorios = rec; paso = 6; busy = false; });
     } catch (e) {
-      if (mounted) setState(() { busy = false; err = isNetworkError(e) ? tr('Sin conexión. No se guardó nada; intenta de nuevo.') : tr('No se pudo guardar. Intenta de nuevo.'); });
+      if (!mounted) return;
+      if (errorApi(e)?.estado == 409) { // ya se había confirmado esta receta
+        ref.invalidate(futureFor('meds')); ref.invalidate(futureFor('horarios'));
+        setState(() { busy = false; recordatorios = true; paso = 6; });
+        aviso(context, tr('Esta receta ya se había guardado.')); return;
+      }
+      setState(() { busy = false; err = isNetworkError(e) ? tr('Sin conexión. No se guardó nada; intenta de nuevo.')
+          : mensajeError(e) ?? tr('No se pudo guardar. Intenta de nuevo.'); });
     }
   }
+
+  /// Foto de la receta a tamaño completo, con zoom, para cotejar lo leído.
+  void _verFoto() {
+    if (foto == null) return;
+    showDialog<void>(context: context, builder: (ctx) => Dialog.fullscreen(child: Scaffold(
+      appBar: AppBar(title: Text(tr('Foto de la receta')), leading: IconButton(tooltip: tr('Cerrar'), icon: const Icon(Icons.close),
+        onPressed: () => Navigator.pop(ctx))),
+      body: InteractiveViewer(maxScale: 6, child: Center(child: Image.memory(foto!, semanticLabel: tr('Foto de la receta')))))));
+  }
+
+  /// La persona elige cuál de las dos lecturas es la correcta; la tarjeta se vuelve a crear con ese valor.
+  void _elegirLectura(int i, String campo, String valor) => setState(() {
+    final disc = Map<String, List<String>>.from(meds[i]['discrepancias'] as Map? ?? {})..remove(campo);
+    meds[i] = {...meds[i], campo: valor, 'discrepancias': disc, '_k': _n++};
+  });
+
+  /// Avisos de un medicamento propuesto: por qué revisarlo, lectura dudosa, discrepancias y componentes.
+  List<Widget> _avisosMed(int i) {
+    final m = meds[i]; final t = Theme.of(context).textTheme;
+    Widget caja(Color col, IconData ic, List<Widget> hijos) => Container(padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(color: col.withValues(alpha: .12), borderRadius: BorderRadius.circular(12), border: Border.all(color: col)),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(ic, color: col), const SizedBox(width: 8),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: hijos))]));
+    final disc = (m['discrepancias'] as Map? ?? {}).cast<String, dynamic>();
+    final comps = [for (final c in (m['componentes'] as List? ?? const [])) textoComponente(c)].where((x) => x.isNotEmpty).toList();
+    return [
+      if (m['por_revisar'] == true) caja(C.warning, Icons.warning_amber_rounded, [
+        Text(tr(motivosRevision['${m['motivo_revision']}'] ?? 'Revísalo: tu equipo de salud lo confirmará.')),
+        Text(tr('Se guardará marcado para que tu equipo de salud lo revise.'), style: t.bodySmall)]),
+      if (m['lectura_dudosa'] == true && foto != null) caja(C.info, Icons.image_search, [
+        Text(tr('Esta línea se leyó con dudas. Compárala con la foto.')),
+        Align(alignment: Alignment.centerLeft, child: TextButton.icon(onPressed: _verFoto, icon: const Icon(Icons.zoom_in), label: Text(tr('Ver la foto'))))]),
+      for (final e in disc.entries) caja(C.warning, Icons.compare_arrows, [
+        Text(tr('Dos lecturas no coinciden en {campo}. ¿Cuál dice la receta?', {'campo': tr(_nombreCampo(e.key)).toLowerCase()})),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: [for (final v in (e.value as List)) OutlinedButton(onPressed: () => _elegirLectura(i, e.key, '$v'), child: Text('$v'))]),
+        if (foto != null) TextButton.icon(onPressed: _verFoto, icon: const Icon(Icons.zoom_in), label: Text(tr('Ver la foto')))]),
+      if (comps.isNotEmpty) caja(C.primary, Icons.merge_type, [Text(tr('Producto combinado:'), style: t.labelLarge), for (final x in comps) Text('• $x')]),
+    ];
+  }
+  static String _nombreCampo(String k) => const {'nombre': 'Nombre comercial', 'dosis': 'Dosis', 'concentracion': 'Concentración',
+    'frecuencia': 'Frecuencia', 'via': 'Vía', 'duracion_dias': 'Duración', 'momento': 'Momento'}[k] ?? k;
 
   Widget _aviso() => InfoCard(child: Row(children: [const Icon(Icons.info_outline, color: C.info), const SizedBox(width: 12),
     Expanded(child: Text(tr('Un sistema automático leyó la receta y puede equivocarse. No se guarda nada hasta que tú confirmes.'), style: Theme.of(context).textTheme.bodyMedium))]));
@@ -100,7 +150,7 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
               hintText: tr('Ej.: Naproxeno 250 mg, 1 tableta cada 8 horas por 5 días'), alignLabelWithHint: true))]);
       case 1:
         return SizedBox(height: 240, child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          CircularProgressIndicator(), SizedBox(height: 16), Text(tr('Leyendo tu receta… puede tardar unos segundos.'))])));
+          CircularProgressIndicator(), SizedBox(height: 16), Text(tr('Leyendo tu receta… puede tardar hasta 25 segundos.'), textAlign: TextAlign.center)])));
       case 2:
         if (meds.isEmpty) {
           return EmptyView(icon: Icons.search_off, title: tr('No detectamos medicamentos'), message: tr('Prueba con una foto más clara y con buena luz.'),
@@ -108,6 +158,13 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
         }
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           InfoCard(child: Text(tr('Se detectaron {n} medicamento(s).', {'n': meds.length}), style: t.headlineSmall)), const SizedBox(height: 12),
+          if (doc?['message_key'] != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: InfoCard(child: MsgText('${doc!['message_key']}'))),
+          // lectura.ilegibles > 0: hay renglones que no se pudieron leer.
+          if (((doc?['lectura'] as Map?)?['ilegibles'] ?? 0) is num && ((doc?['lectura'] as Map?)?['ilegibles'] ?? 0) > 0)
+            Padding(padding: const EdgeInsets.only(bottom: 12), child: InfoCard(child: Row(children: [
+              const Icon(Icons.report_problem_outlined, color: C.warning), const SizedBox(width: 12),
+              Expanded(child: Text(tr('Hay {n} medicamento(s) que no se pudieron leer. Agrégalos a mano o toma otra foto.',
+                {'n': (doc!['lectura'] as Map)['ilegibles']})))]))),
           if ('${doc?['texto_ocr'] ?? ''}'.isNotEmpty) InfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(tr('Texto leído'), style: t.labelLarge), Text('${doc!['texto_ocr']}')])),
           // Cruces de medicación (rojo primero) con su fuente.
@@ -116,7 +173,9 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
               SemaforoBadge('${a['nivel'] ?? 'ambar'}'), const SizedBox(height: 8),
               if (a['message_key'] != null) MsgText('${a['message_key']}'),
               if (a['fuente'] != null || a['cita'] != null) Padding(padding: const EdgeInsets.only(top: 6),
-                child: Text([a['fuente'], a['cita']].whereType<Object>().join(' · '), style: t.bodySmall))]))),
+                child: Text([a['fuente'], a['cita']].whereType<Object>().join(' · '), style: t.bodySmall)),
+              if (a['verificada'] == false) Padding(padding: const EdgeInsets.only(top: 6),
+                child: Text(tr('Pendiente de validación clínica'), style: t.bodySmall?.copyWith(color: C.warning, fontWeight: FontWeight.w700)))]))),
           if ((doc?['alergias_en_documento'] as List? ?? []).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: InfoCard(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(tr('Alergias que aparecen en el documento'), style: t.labelLarge),
@@ -125,12 +184,11 @@ class _RecetaState extends ConsumerState<RecetaFlowScreen> {
           const SizedBox(height: 12), _aviso()]);
       case 3:
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [_aviso(),
-          for (var i = 0; i < meds.length; i++) Padding(padding: const EdgeInsets.only(top: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            // por_revisar: no se identificó la sustancia; se guarda marcado para que el equipo lo revise.
-            if (meds[i]['por_revisar'] == true) Container(padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(color: C.warning.withValues(alpha: .12), borderRadius: BorderRadius.circular(12), border: Border.all(color: C.warning)),
-              child: Row(children: [const Icon(Icons.warning_amber_rounded, color: C.warning), const SizedBox(width: 8),
-                Expanded(child: Text(tr('Por revisar: no lo encontramos en el catálogo. Tu equipo de salud lo revisará.')))])),
+          for (var i = 0; i < meds.length; i++) Padding(padding: const EdgeInsets.only(top: 24), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            // Encabezado por medicamento: deja claro a cuál pertenecen los avisos que siguen.
+            Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(tr('Medicamento {n} de {t}', {'n': i + 1, 't': meds.length}),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: C.primary))),
+            ..._avisosMed(i),
             OCRReviewCard(key: ValueKey(meds[i]['_k']), med: meds[i], onChanged: (m) => meds[i] = m, onDiscard: () => setState(() => meds.removeAt(i)))])),
           if (!_revisionOk) Padding(padding: const EdgeInsets.only(top: 12), child: Text(meds.isEmpty ? tr('No queda ningún medicamento.') : tr('Completa nombre y dosis de cada medicamento.'), style: const TextStyle(color: C.error)))]);
       case 4:

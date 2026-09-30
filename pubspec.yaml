@@ -1,5 +1,5 @@
 name: medmap
-description: MEDMAP - seguimiento de pacientes (HackaTec 2026)
+description: SENDA - seguimiento de pacientes entre consultas (HackaTec 2026)
 publish_to: none
 environment: {sdk: ">=3.3.0 <4.0.0"}
 dependencies:
@@ -36,7 +36,33 @@ dev_dependencies:
   drift_dev: ^2.18.0
   build_runner: ^2.4.9
   flutter_lints: ^4.0.0
+  # Marca SENDA en Android/iOS (cuando existan esas carpetas):
+  #   flutter create --platforms=android,ios .
+  #   dart run flutter_launcher_icons && dart run flutter_native_splash:create
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
 flutter:
   uses-material-design: true
   assets:
     - assets/sonidos/alarma.wav
+    - assets/marca/
+
+# Icono de la app SENDA (Android e iOS). El de web ya está en web/icons y web/favicon.png.
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/marca/senda_icono.png"
+  adaptive_icon_background: "#593286"
+  adaptive_icon_foreground: "assets/marca/senda_icono_primer_plano.png"
+  remove_alpha_ios: true
+  web:
+    generate: false
+
+# Pantalla de arranque nativa SENDA (Android e iOS). La de web está en web/index.html.
+flutter_native_splash:
+  color: "#593286"
+  image: assets/marca/senda_splash.png
+  android_12:
+    color: "#593286"
+    image: assets/marca/senda_splash_android12.png
+  web: false

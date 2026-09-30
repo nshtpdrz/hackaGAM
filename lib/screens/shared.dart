@@ -5,10 +5,14 @@ import '../core/state.dart';
 import '../core/theme.dart';
 import '../widgets/cards.dart';
 import '../core/tr.dart';
+import '../widgets/marca.dart';
 
 /// Scaffold base: título, campana de notificaciones y botón flotante opcional.
 Widget page(BuildContext c, String title, Widget body, {bool bell = true, Widget? fab}) => Scaffold(
     appBar: AppBar(title: Text(tr(title), style: Theme.of(c).textTheme.headlineSmall), backgroundColor: C.bg,
+        // Pantallas raíz (pestañas): icono SENDA; pantallas abiertas encima: flecha de regreso.
+        leading: (ModalRoute.of(c)?.canPop ?? false) ? null
+            : const Padding(padding: EdgeInsets.all(10), child: IconoSenda(tam: 36, decorativo: true)),
         actions: [const SelectorPaciente(), if (bell) const NotifBell()]),
     body: body, floatingActionButton: fab == null ? null : MediaQuery(
       data: MediaQuery.of(c).copyWith(textScaler: MediaQuery.textScalerOf(c).clamp(maxScaleFactor: 1.3)), child: fab));

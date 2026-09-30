@@ -222,40 +222,120 @@ List<Map<String, dynamic>> normalizarMedicamentos(dynamic r) => [
 /// alertas_medicacion de /medicamentos o de un documento -> [{nivel, message_key, fuente, cita}] (rojo primero)
 List<Map<String, dynamic>> alertasMedicacion(dynamic r) {
   final l = [for (final a in lista(_m(r)['alertas_medicacion'])) if (a is Map) <String, dynamic>{...a.cast<String, dynamic>(),
-    'nivel': _s(a, ['nivel']) ?? 'ambar', 'message_key': _s(a, ['mensaje_clave', 'message_key']), 'fuente': a['fuente'], 'cita': a['cita']}];
+    'nivel': _s(a, ['nivel']) ?? 'ambar', 'message_key': _s(a, ['mensaje_clave', 'message_key']), 'fuente': a['fuente'], 'cita': a['cita'],
+    'regla': a['regla'], 'verificada': a['verificada'] != false}];
   return l..sort((a, b) => (a['nivel'] == 'rojo' ? 0 : 1).compareTo(b['nivel'] == 'rojo' ? 0 : 1));
 }
 
-/// POST documentos (propuesta, nada guardado) -> {id, medicamentos, advertencias, alergias_en_documento, texto_ocr}
+/// Motivos de revisión de MEDMAP -> texto para la persona.
+const motivosRevision = {
+  'sustancia_no_encontrada_en_catalogo': 'No encontramos este medicamento en el catálogo.',
+  'producto_combinado_no_soportado': 'Es un producto combinado que el sistema aún no reconoce.',
+  'clasificada_por_ia_fuera_de_catalogo': 'La sustancia la clasificó la IA; no está en el catálogo.',
+  'sustancia_inferida_por_ia': 'La sustancia la dedujo la IA: confírmala.',
+  'lectura_dudosa': 'La lectura es dudosa: compárala con la foto.'};
+
+/// Campo de discrepancia de la API -> campo del formulario de revisión.
+const _campoRevision = {'nombre_comercial': 'nombre', 'frecuencia_horas': 'frecuencia'};
+
+/// POST documentos (propuesta, nada guardado) -> {id, archivo_url, medicamentos, advertencias, alergias_en_documento,
+/// lectura {manuscrito, renglones_dudosos, doble_lectura, ilegibles}, message_key, texto_ocr}
 Map<String, dynamic> normalizarDocumento(dynamic r) {
   final m = _m(r); final doc = _m(m['documento']);
-  return {'id': m['id'] ?? m['documento_id'] ?? doc['id'], 'texto_ocr': _s(m, ['texto_ocr', 'texto']) ?? _s(doc, ['texto_ocr']),
+  return {'id': m['id'] ?? m['documento_id'] ?? doc['id'], 'archivo_url': doc['archivo_url'] ?? m['archivo_url'],
+    'texto_ocr': _s(m, ['texto_ocr', 'texto']) ?? _s(doc, ['texto_ocr']),
     'alergias_en_documento': lista(m['alergias_en_documento']), 'advertencias': alertasMedicacion(m),
+    'lectura': _m(m['lectura']), 'message_key': _s(m, ['mensaje_clave', 'message_key']),
     'medicamentos': [for (final x in lista(m['medicamentos'])) if (x is Map) () {
       final sus = _m(x['sustancia']); final comb = _m(x['producto_combinado']);
       final hp = x['horarios_propuestos'] ?? x['horarios'];
-      return <String, dynamic>{'nombre': _s(x, ['nombre_comercial', 'nombre']) ?? '', 'sustancia': _s(sus, ['nombre']) ?? _s(x, ['sustancia']) ?? '',
-        'sustancia_id': sus['id'], 'producto_combinado_id': comb['id'], 'componentes': comb.isEmpty ? null : lista(comb['componentes']),
+      // null en la API = no está escrito o no se leyó con certeza: queda vacío para que la persona lo complete.
+      final disc = <String, List<String>>{};
+      _m(x['discrepancias']).forEach((k, v) {
+        final opciones = [for (final o in _m(v).values) if (o != null && '$o'.trim().isNotEmpty) '$o'].toSet().toList();
+        if (opciones.isNotEmpty) disc[_campoRevision['$k'] ?? '$k'] = opciones;
+      });
+      final comps = lista(x['componentes']).isNotEmpty ? lista(x['componentes']) : lista(comb['componentes']);
+      return <String, dynamic>{'nombre': _s(x, ['nombre_comercial', 'nombre']) ?? '',
+        'sustancia': _s(sus, ['nombre_generico', 'nombre']) ?? _s(x, ['sustancia']) ?? '',
+        'sustancia_id': sus['id'], 'sustancia_ia': sus['origen'] == 'ia', 'clase': sus['clase'],
+        'producto_combinado_id': comb['id'], 'componentes': comps.isEmpty ? null : comps, 'candidatos': lista(x['candidatos']),
         'concentracion': _s(x, ['concentracion']) ?? '', 'dosis': _s(x, ['dosis']) ?? '', 'frecuencia': _frecuencia(x),
-        'frecuencia_horas': x['frecuencia_horas'], 'duracion_dias': x['duracion_dias'], 'via': _s(x, ['via']) ?? 'oral',
+        'frecuencia_horas': x['frecuencia_horas'], 'duracion_dias': x['duracion_dias'], 'via': _s(x, ['via']) ?? '',
+        'momento': _s(x, ['momento']) ?? '',
         'horarios': [for (final h in lista(hp)) h is Map ? _s(h, ['hora_local', 'hora']) : '$h'],
-        'por_revisar': x['por_revisar'] == true, 'motivo_revision': x['motivo_revision']};
+        'por_revisar': x['por_revisar'] == true, 'motivo_revision': x['motivo_revision'],
+        'lectura_dudosa': x['lectura_dudosa'] == true || x['motivo_revision'] == 'lectura_dudosa', 'discrepancias': disc};
     }()]};
 }
 
+/// "cada 8 h", "8", "cada 8 horas" -> 8
+int? horasDeFrecuencia(Object? texto) => int.tryParse(RegExp(r'\d+').firstMatch('${texto ?? ''}')?.group(0) ?? '');
+
+/// Nombre legible de un componente de un producto combinado.
+String textoComponente(Object? c) {
+  final m = _m(c); final sus = _m(m['sustancia']);
+  return [_s(sus, ['nombre_generico', 'nombre']) ?? _s(m, ['nombre', 'sustancia']) ?? '', _s(m, ['concentracion']) ?? '']
+      .where((x) => x.isNotEmpty).join(' ');
+}
+
 /// Lo revisado por la persona -> cuerpo de POST /documentos/:id/confirmar.
-/// No se manda sustancia_id si viene null (sustancia categorizada por IA): queda "por revisar" para el equipo.
+/// sustancia_id va solo si el catálogo lo reconoció (con origen IA viene null y queda "por revisar" para el equipo).
 Map<String, dynamic> confirmacionDocumento(List meds, {List reemplaza = const []}) => {
   'medicamentos': [for (final x in meds) if (x is Map) {
-    'nombre_comercial': x['nombre'], 'concentracion': x['concentracion'], 'dosis': x['dosis'],
+    'nombre_comercial': x['nombre'],
+    if ('${x['concentracion'] ?? ''}'.isNotEmpty) 'concentracion': x['concentracion'],
+    if ('${x['dosis'] ?? ''}'.isNotEmpty) 'dosis': x['dosis'],
+    if ('${x['via'] ?? ''}'.isNotEmpty) 'via': x['via'],
+    if ('${x['momento'] ?? ''}'.isNotEmpty) 'momento': x['momento'],
     if (x['producto_combinado_id'] != null) ...{'producto_combinado_id': x['producto_combinado_id'],
       'componentes': [for (final c in (x['componentes'] as List? ?? const [])) if (c is Map)
         {'sustancia_id': _m(c['sustancia'])['id'] ?? c['sustancia_id'], 'concentracion': c['concentracion']}]}
     else if (x['sustancia_id'] != null) 'sustancia_id': x['sustancia_id'],
-    if (x['frecuencia_horas'] != null) 'frecuencia_horas': x['frecuencia_horas'],
-    if (x['duracion_dias'] != null) 'duracion_dias': x['duracion_dias'],
-    'horarios': x['horarios'] ?? const []}],
+    // Si la persona corrigió "cada 8 h", se toma el número que escribió.
+    if ((horasDeFrecuencia(x['frecuencia']) ?? x['frecuencia_horas']) != null) 'frecuencia_horas': horasDeFrecuencia(x['frecuencia']) ?? x['frecuencia_horas'],
+    'duracion_dias': x['duracion_dias'],
+    'horarios': x['horarios'] ?? const [], 'dias': x['dias'] ?? const [1, 2, 3, 4, 5, 6, 7]}],
   'reemplaza': reemplaza};
+
+// ---------- seguimiento fotográfico de lesiones ----------
+
+const tiposLesion = {'herida_quirurgica': 'Herida quirúrgica', 'ulcera_presion': 'Úlcera por presión', 'pie_diabetico': 'Pie diabético',
+  'lesion_piel': 'Lesión de piel', 'sitio_cateter': 'Sitio de catéter', 'otra': 'Otra'};
+const zonasCorporales = {'cabeza_cara': 'Cabeza o cara', 'cuello': 'Cuello', 'torax': 'Tórax', 'abdomen': 'Abdomen', 'espalda': 'Espalda',
+  'sacro_gluteo': 'Sacro o glúteo', 'brazo': 'Brazo', 'antebrazo': 'Antebrazo', 'mano': 'Mano', 'muslo': 'Muslo', 'rodilla': 'Rodilla',
+  'pierna': 'Pierna', 'tobillo': 'Tobillo', 'talon': 'Talón', 'pie_dorso': 'Dorso del pie', 'pie_planta': 'Planta del pie',
+  'dedos_pie': 'Dedos del pie', 'otra': 'Otra'};
+const ladosCuerpo = {'izquierdo': 'Izquierdo', 'derecho': 'Derecho', 'centro': 'Centro'};
+const referenciasFoto = {'moneda_10_pesos': 'Moneda de 10 pesos', 'tarjeta': 'Tarjeta', 'ninguna': 'Ninguna'};
+
+/// Lesión en seguimiento -> {id, tipo, zona_corporal, lado, descripcion, ultima_foto, fotos, ...}
+Map<String, dynamic> normalizarLesion(dynamic r) {
+  final m = _m(r); final l = _m(m['lesion']).isNotEmpty ? _m(m['lesion']) : m;
+  final fotos = [for (final f in lista(m['fotos'] ?? l['fotos'])) if (f is Map) normalizarFotoLesion(f)]
+    ..sort((a, b) => '${b['tomada_en']}'.compareTo('${a['tomada_en']}'));
+  return {...m.cast<String, dynamic>(), ...l.cast<String, dynamic>(), 'id': '${l['id']}', 'tipo': l['tipo'], 'zona_corporal': l['zona_corporal'],
+    'lado': l['lado'], 'descripcion': l['descripcion'], 'fotos': fotos,
+    'ultima_foto': fotos.isNotEmpty ? fotos.first : (l['ultima_foto'] is Map ? normalizarFotoLesion(l['ultima_foto']) : null),
+    'evolucion': m['evolucion'] ?? l['evolucion']};
+}
+List<Map<String, dynamic>> normalizarLesiones(dynamic r) => [for (final x in lista(r, ['lesiones'])) if (x is Map) normalizarLesion(x)];
+
+/// Foto de lesión (respuesta de POST /lesiones/:id/fotos o elemento de GET /lesiones/:id).
+Map<String, dynamic> normalizarFotoLesion(dynamic r) {
+  final m = _m(r); final f = _m(m['foto']).isNotEmpty ? _m(m['foto']) : m;
+  final t = _instante(f['tomada_en']);
+  return {...f.cast<String, dynamic>(), 'id': f['id'], 'tomada_en': f['tomada_en'], 'fecha': t == null ? null : _fechaCorta(t),
+    'largo_cm': f['largo_cm'], 'ancho_cm': f['ancho_cm'], 'estado': _s(f, ['estado']) ?? _s(m, ['estado']),
+    'message_key': _s(m, ['mensaje_clave']) ?? _s(f, ['mensaje_clave']), 'comparacion': m['comparacion'] ?? f['comparacion'],
+    'descripcion_ia': _s(f, ['descripcion_ia', 'descripcion']), 'escala': f['escala']};
+}
+/// Tamaño legible: "3.2 × 1.8 cm" (o null si no se pudo medir).
+String? tamanoLesion(Map? f) {
+  if (f == null || f['largo_cm'] == null) return null;
+  String n(Object? v) => v is num ? v.toStringAsFixed(1) : '$v';
+  return f['ancho_cm'] == null ? '${n(f['largo_cm'])} cm' : '${n(f['largo_cm'])} × ${n(f['ancho_cm'])} cm';
+}
 
 // ---------- alertas, pacientes, expediente, QR ----------
 

@@ -1,4 +1,6 @@
 <!-- ios/Runner/Info.plist, dentro de <dict>: -->
+<key>CFBundleDisplayName</key>
+<string>SENDA</string>
 <key>NSCameraUsageDescription</key>
 <string>Se usa la cámara para escanear códigos QR, fotografiar recetas o cajas de medicamentos y tomar tu foto de perfil.</string>
 <key>NSPhotoLibraryUsageDescription</key>

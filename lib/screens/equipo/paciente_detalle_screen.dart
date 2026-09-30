@@ -43,6 +43,8 @@ class PacienteDetalleScreen extends ConsumerWidget { final String id;
         onTap: () => Navigator.of(c).push(MaterialPageRoute(builder: (_) => _ResumenScreen(id: id, nombre: '${p['nombre']}')))),
         const SizedBox(height: 12)],
       BigButton(tr('Ver expediente'), icon: Icons.folder_open, secondary: medico, onTap: () => c.push('/expediente/$id')),
+      const SizedBox(height: 12),
+      BigButton(tr('Heridas en seguimiento'), icon: Icons.healing_outlined, secondary: true, onTap: () => c.push('/paciente/$id/heridas')),
       if (medico) ...[const SizedBox(height: 12),
         BigButton(tr('Plan de control'), icon: Icons.tune, secondary: true, onTap: () => c.push('/plan/$id'))],
       const SizedBox(height: 24),

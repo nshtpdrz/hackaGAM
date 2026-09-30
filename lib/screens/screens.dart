@@ -3,6 +3,7 @@ export 'auth/register_screen.dart';
 export 'auth/splash_screen.dart';
 export 'auth/consentimiento_screen.dart';
 export 'compartidas/historial_screen.dart';
+export 'compartidas/heridas_screen.dart';
 export 'compartidas/medicamentos_screen.dart';
 export 'compartidas/preferencias_screen.dart';
 export 'compartidas/perfil_screen.dart';
